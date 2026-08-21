@@ -55,6 +55,11 @@ public final class Benchmark {
     interface Scenario {
         String name();
 
+        /** Operations per measured iteration (default 1M; parallel scenarios use less). */
+        default int ops() {
+            return OPS;
+        }
+
         /** Runs {@code n} operations, folding each output into the digest. */
         double run(int n, long seed, Digest dg);
     }
@@ -104,7 +109,7 @@ public final class Benchmark {
                 for (int it = 0; it < iters; it++) {
                     long seed = 900_000L + it;
                     Digest dg = new Digest();
-                    int n = OPS;
+                    int n = s.ops();
                     long t0 = System.nanoTime();
                     long a0 = TMX.getThreadAllocatedBytes(Thread.currentThread().getId());
                     double blackhole = s.run(n, seed, dg);
@@ -123,6 +128,7 @@ public final class Benchmark {
                 }
             }
         }
+        PARALLEL_POOL.shutdownNow();
         System.out.println("written: " + out);
     }
 
@@ -336,7 +342,116 @@ public final class Benchmark {
             return bh;
         }));
 
+        // ---- Parallel scenarios: shared engine objects across 8 threads ----
+        WorldCache2D<Integer> sharedCache = new WorldCache2D<>((x, z) -> signature.fit(-100, 100, x, z), 1024);
+        out.add(parallelScenario("par-cng-noise2d", 8, (nn, seed, dg) -> {
+            Random r = new Random(seed);
+            double bh = 0;
+            for (int i = 0; i < nn; i++) {
+                double v = signature.noise(r.nextInt(200_000) - 100_000, r.nextInt(200_000) - 100_000);
+                dg.add(v);
+                bh += v;
+            }
+            return bh;
+        }));
+        out.add(parallelScenario("par-worldcache2d", 8, (nn, seed, dg) -> {
+            Random r = new Random(seed);
+            int region = (int) (seed % 64);
+            double bh = 0;
+            for (int i = 0; i < nn; i++) {
+                if ((i & 1023) == 0) {
+                    r.setSeed(seed + (i >> 10));
+                }
+                int cx = (region * 7919 + r.nextInt(200)) - 100, cz = r.nextInt(200) - 100;
+                int baseX = cx << 4, baseZ = cz << 4;
+                for (int a = 0; a < 16; a += 2) {
+                    for (int b = 0; b < 16; b += 2) {
+                        Integer v = sharedCache.get(baseX + a, baseZ + b);
+                        dg.add(v);
+                        bh += v;
+                    }
+                }
+            }
+            return bh;
+        }));
+
+        // Production-like raster pattern: one chunk window is rastered for a
+        // stretch of ops before moving on (models parallel chunk generation
+        // sharing cache2D streams with spatial locality).
+        out.add(parallelScenario("par-worldcache2d-raster", 8, (nn, seed, dg) -> {
+            Random r = new Random(seed);
+            int region = (int) (seed % 64);
+            double bh = 0;
+            int cx = 0, cz = 0;
+            for (int i = 0; i < nn; i++) {
+                if ((i & 1023) == 0) {
+                    r.setSeed(seed + (i >> 10));
+                    cx = (region * 7919 + r.nextInt(200)) - 100;
+                    cz = r.nextInt(200) - 100;
+                }
+                int baseX = cx << 4, baseZ = cz << 4;
+                for (int a = 0; a < 16; a += 2) {
+                    for (int b = 0; b < 16; b += 2) {
+                        Integer v = sharedCache.get(baseX + a, baseZ + b);
+                        dg.add(v);
+                        bh += v;
+                    }
+                }
+            }
+            return bh;
+        }));
+
         return out;
+    }
+
+    private static final java.util.concurrent.ExecutorService PARALLEL_POOL =
+            java.util.concurrent.Executors.newFixedThreadPool(8);
+
+    /**
+     * Runs an operation body on {@code threads} workers simultaneously, each
+     * performing {@code n} iterations with per-thread seeds ({@code seed+t}).
+     * Per-thread digests are folded in index order so the merged digest is
+     * deterministic regardless of scheduling. ns/op is wall-time based.
+     */
+    private static Scenario parallelScenario(String name, int threads, Op body) {
+        Scenario s = sc(name, (n, seed, dg) -> {
+            try {
+                Digest[] parts = new Digest[threads];
+                java.util.concurrent.Future<Double>[] futures = new java.util.concurrent.Future[threads];
+                for (int t = 0; t < threads; t++) {
+                    parts[t] = new Digest();
+                    final int ft = t;
+                    final Digest local = parts[t];
+                    futures[t] = PARALLEL_POOL.submit(() -> body.run(n, seed + ft, local));
+                }
+                double bh = 0;
+                for (int t = 0; t < threads; t++) {
+                    bh += futures[t].get();
+                    dg.h ^= parts[t].h; // fold in deterministic order
+                    dg.h *= 0x100000001b3L;
+                    dg.count += parts[t].count;
+                }
+                return bh;
+            } catch (java.util.concurrent.ExecutionException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        return new Scenario() {
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public int ops() {
+                return 150_000; // each op fans out to `threads` workers
+            }
+
+            @Override
+            public double run(int n, long seed, Digest dg) {
+                return s.run(n, seed, dg);
+            }
+        };
     }
 
     private static Scenario interpScenario(String name, IrisInterpolator interp, CNG cng) {

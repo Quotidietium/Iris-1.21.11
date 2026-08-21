@@ -73,8 +73,9 @@ public class AtomicCache<T> {
     }
 
     public T aquire(Supplier<T> t) {
-        if (this.t.get() != null) {
-            return this.t.get();
+        T v = this.t.get();
+        if (v != null) {
+            return v;
         } else if (nullSupport && set.get()) {
             return null;
         }

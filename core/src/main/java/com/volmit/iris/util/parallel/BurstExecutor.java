@@ -59,25 +59,7 @@ public class BurstExecutor {
 
     public BurstExecutor queue(List<Runnable> r) {
         if (!multicore) {
-            for (Runnable i : new KList<>(r)) {
-                i.run();
-            }
-
-            return this;
-        }
-
-        synchronized (futures) {
-            for (Runnable i : new KList<>(r)) {
-                queue(i);
-            }
-        }
-
-        return this;
-    }
-
-    public BurstExecutor queue(Runnable[] r) {
-        if (!multicore) {
-            for (Runnable i : new KList<>(r)) {
+            for (Runnable i : r) {
                 i.run();
             }
 
@@ -86,7 +68,27 @@ public class BurstExecutor {
 
         synchronized (futures) {
             for (Runnable i : r) {
-                queue(i);
+                Future<?> c = executor.submit(i);
+                futures.add(c);
+            }
+        }
+
+        return this;
+    }
+
+    public BurstExecutor queue(Runnable[] r) {
+        if (!multicore) {
+            for (Runnable i : r) {
+                i.run();
+            }
+
+            return this;
+        }
+
+        synchronized (futures) {
+            for (Runnable i : r) {
+                Future<?> c = executor.submit(i);
+                futures.add(c);
             }
         }
 

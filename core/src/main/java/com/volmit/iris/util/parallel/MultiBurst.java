@@ -30,14 +30,16 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntSupplier;
 
 public class MultiBurst implements ExecutorService {
     private static final long TIMEOUT = Long.getLong("iris.burst.timeout", 15000);
     public static final MultiBurst burst = new MultiBurst();
     public static final MultiBurst ioBurst = new MultiBurst("Iris IO", () -> IrisSettings.get().getConcurrency().getIoParallelism());
-    private final AtomicLong last;
+    // Idle-time bookkeeping stamp. Nothing reads this on any hot path; a plain
+    // volatile write avoids the AtomicLong read-modify-write cache-line
+    // contention that getService() used to cause on every burst.
+    private volatile long last;
     private final String name;
     private final int priority;
     private final IntSupplier parallelism;
@@ -61,11 +63,11 @@ public class MultiBurst implements ExecutorService {
         this.name = name;
         this.priority = priority;
         this.parallelism = parallelism;
-        last = new AtomicLong(M.ms());
+        last = M.ms();
     }
 
     private ExecutorService getService() {
-        last.set(M.ms());
+        last = M.ms();
         if (service != null && !service.isShutdown())
             return service;
 
@@ -121,7 +123,7 @@ public class MultiBurst implements ExecutorService {
     }
 
     private void sync(List<Runnable> r) {
-        for (Runnable i : new KList<>(r)) {
+        for (Runnable i : r) {
             i.run();
         }
     }

@@ -394,7 +394,12 @@ public class IrisComplex implements DataProvider {
 
         CNG childCell = b.getChildrenGenerator(rng, 123, b.getChildShrinkFactor());
         IrisBiome biome = childCell.fitRarityMapped(implodeRarityMap(b), x, z);
-        biome.setInferredType(b.getInferredType());
+        // Only write when the value actually changes: shared child biomes are
+        // imploded from many generation threads at once, and redundant plain
+        // writes to the same value still bounce the field's cache line.
+        if (biome.getInferredType() != b.getInferredType()) {
+            biome.setInferredType(b.getInferredType());
+        }
         return implode(biome, x, z, max - 1);
     }
 

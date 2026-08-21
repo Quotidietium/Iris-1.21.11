@@ -1,12 +1,13 @@
 package com.volmit.iris.util.cache;
 
-import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.volmit.iris.engine.data.cache.Cache;
 import com.volmit.iris.util.function.Function2;
 
 public class WorldCache2D<T> {
-    private final ConcurrentLinkedHashMap<Long, ChunkCache2D<T>> chunks;
+    private final com.github.benmanes.caffeine.cache.Cache<Long, ChunkCache2D<T>> chunks;
     private final Function2<Integer, Integer, T> resolver;
+    private final int maxSize;
 
     // Single-slot memo for the boxed chunk key: generation rasters the same
     // chunk for hundreds of consecutive gets. One volatile reference keeps the
@@ -15,10 +16,14 @@ public class WorldCache2D<T> {
 
     public WorldCache2D(Function2<Integer, Integer, T> resolver, int size) {
         this.resolver = resolver;
-        chunks = new ConcurrentLinkedHashMap.Builder<Long, ChunkCache2D<T>>()
+        this.maxSize = size;
+        // Caffeine replaces ConcurrentLinkedHashMap: the cache is a pure
+        // memoization layer (any eviction policy yields identical values, only
+        // recompute cost differs), and Caffeine's read path scales far better
+        // under many generation threads.
+        this.chunks = Caffeine.newBuilder()
                 .initialCapacity(size)
-                .maximumWeightedCapacity(size)
-                .concurrencyLevel(Math.max(32, Runtime.getRuntime().availableProcessors() * 4))
+                .maximumSize(size)
                 .build();
     }
 
@@ -29,15 +34,15 @@ public class WorldCache2D<T> {
             boxed = k;
             lastKeyBoxed = boxed;
         }
-        ChunkCache2D<T> chunk = chunks.computeIfAbsent(boxed, $ -> new ChunkCache2D<>());
+        ChunkCache2D<T> chunk = chunks.get(boxed, $ -> new ChunkCache2D<>());
         return chunk.get(x, z, resolver);
     }
 
     public long getSize() {
-        return chunks.size() * 256L;
+        return chunks.estimatedSize() * 256L;
     }
 
     public long getMaxSize() {
-        return chunks.capacity() * 256L;
+        return maxSize * 256L;
     }
 }
