@@ -326,6 +326,26 @@ public final class Benchmark {
             return bh;
         }));
 
+        // Hot hit-path: one fixed chunk rastered every op (post-warmup every
+        // get is a cache hit) — isolates raw lookup cost from resolver noise.
+        WorldCache2D<Integer> hotCache = new WorldCache2D<>((x, z) -> signature.fit(-100, 100, x, z), 1024);
+        out.add(sc("worldcache2d-hit", (n, seed, dg) -> {
+            Random r = new Random(seed);
+            int cx = r.nextInt(1000) - 500, cz = r.nextInt(1000) - 500;
+            int baseX = cx << 4, baseZ = cz << 4;
+            double bh = 0;
+            for (int i = 0; i < n; i++) {
+                for (int a = 0; a < 16; a++) {
+                    for (int b = 0; b < 16; b += 4) {
+                        Integer v = hotCache.get(baseX + a, baseZ + b);
+                        dg.add(v);
+                        bh += v;
+                    }
+                }
+            }
+            return bh;
+        }));
+
         // ---- Per-column RNG (decorator pattern) ----
         out.add(sc("rng-column", (n, seed, dg) -> {
             Random r = new Random(seed);
