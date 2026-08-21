@@ -1,54 +1,54 @@
 package com.volmit.iris.util.cache;
 
-import com.volmit.iris.util.function.Function2;
+import com.volmit.iris.util.function.IntFunction2;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
+/**
+ * Per-chunk (16x16) memo pad for a {@link WorldCache2D}. Cells hold the
+ * resolved value directly; first access claims the slot via CAS on a
+ * COMPUTING sentinel so exactly one thread runs the resolver, others wait
+ * (mirrors the previous per-cell Entry's synchronized double-checked lock,
+ * without allocating an Entry object per cell). Null results are not
+ * memoized, matching the previous behavior. {@code iris.cache.fast} skips
+ * the waiting entirely (racy duplicate compute, identical value).
+ */
 public class ChunkCache2D<T> {
     private static final boolean FAST = Boolean.getBoolean("iris.cache.fast");
-    private static final VarHandle AA = MethodHandles.arrayElementVarHandle(Entry[].class);
+    private static final VarHandle AA = MethodHandles.arrayElementVarHandle(Object[].class);
+    private static final Object COMPUTING = new Object();
 
-    private final Entry<T>[] cache;
+    private final Object[] cache = new Object[256];
 
-    @SuppressWarnings({"unchecked"})
-    public ChunkCache2D() {
-        // Entries are created lazily on first access per cell (the CAS in get()
-        // already owns this path); pre-allocating 256 entries per chunk per
-        // stream burned ~6KB/chunk for cells that are often never read.
-        this.cache = new Entry[256];
-    }
-
-    @SuppressWarnings({"unchecked"})
-    public T get(int x, int z, Function2<Integer, Integer, T> resolver) {
-        int key = ((z & 15) * 16) + (x & 15);
-        var entry = cache[key];
-        if (entry == null) {
-            entry = FAST ? new FastEntry<>() : new Entry<>();
-            if (!AA.compareAndSet(cache, key, null, entry)) {
-                entry = (Entry<T>) AA.getVolatile(cache, key);
+    @SuppressWarnings("unchecked")
+    public T get(int x, int z, IntFunction2<T> resolver) {
+        int key = ((z & 15) << 4) + (x & 15);
+        Object v = AA.getAcquire(cache, key);
+        if (v != null && v != COMPUTING) {
+            return (T) v;
+        }
+        if (v == null && AA.compareAndSet(cache, key, null, COMPUTING)) {
+            T r;
+            try {
+                r = resolver.apply(x, z);
+            } catch (Throwable t) {
+                AA.setRelease(cache, key, null);
+                throw t;
             }
+            AA.setRelease(cache, key, r == null ? null : r);
+            return r;
         }
-        return entry.compute(x, z, resolver);
-    }
-
-    private static class Entry<T> {
-        protected volatile T t;
-
-        protected T compute(int x, int z, Function2<Integer, Integer, T> resolver) {
-            if (t != null) return t;
-            synchronized (this) {
-                if (t == null) t = resolver.apply(x, z);
-                return t;
+        if (FAST) {
+            T r = resolver.apply(x, z);
+            if (r != null) {
+                AA.setRelease(cache, key, r);
             }
+            return r;
         }
-    }
-
-    private static class FastEntry<T> extends Entry<T> {
-        @Override
-        protected T compute(int x, int z, Function2<Integer, Integer, T> resolver) {
-            if (t != null) return t;
-            return t = resolver.apply(x, z);
+        while ((v = AA.getAcquire(cache, key)) == COMPUTING) {
+            Thread.onSpinWait();
         }
+        return (T) v;
     }
 }
