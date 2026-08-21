@@ -403,9 +403,113 @@ public class IrisInterpolation {
     }
 
     public static double getStarcast3D(int x, int y, int z, double rad, double checks, NoiseProvider3 n) {
-        return (Starcast.starcast(x, z, rad, checks, (xx, zz) -> n.noise(xx, y, zz))
-                + Starcast.starcast(x, y, rad, checks, (xx, yy) -> n.noise(xx, yy, z))
-                + Starcast.starcast(y, z, rad, checks, (yy, zz) -> n.noise(x, yy, zz))) / 3D;
+        Starcast3DAdapter plane = Starcast3DAdapter.acquire();
+        double r;
+        try {
+            plane.setPlane(n, Starcast3DAdapter.PLANE_Y, y);
+            double a = Starcast.starcast(x, z, rad, checks, plane);
+            plane.setPlane(n, Starcast3DAdapter.PLANE_Z, z);
+            double b = Starcast.starcast(x, y, rad, checks, plane);
+            plane.setPlane(n, Starcast3DAdapter.PLANE_X, x);
+            double cc = Starcast.starcast(y, z, rad, checks, plane);
+            r = (a + b + cc) / 3D;
+        } finally {
+            Starcast3DAdapter.release();
+        }
+        return r;
+    }
+
+    /**
+     * TRILINEAR_TRISTARCAST composition without per-call capturing lambdas:
+     * starcast planes delegate to a trilinear adapter over the user provider.
+     * Expression structure (and int casts) mirror the previous lambda chain.
+     */
+    private static double trilinearStarcast3D(int x, int y, int z, double radx, double rady, double radz, double checks, NoiseProvider3 n) {
+        Starcast3DAdapter tri = Starcast3DAdapter.acquire();
+        Starcast3DAdapter plane = Starcast3DAdapter.acquire();
+        double r;
+        try {
+            tri.setTrilinear(radx, rady, radz, n);
+            plane.setPlane(tri, Starcast3DAdapter.PLANE_Y, y);
+            double a = Starcast.starcast(x, z, radx, checks, plane);
+            plane.setPlane(tri, Starcast3DAdapter.PLANE_Z, z);
+            double b = Starcast.starcast(x, y, radx, checks, plane);
+            plane.setPlane(tri, Starcast3DAdapter.PLANE_X, x);
+            double cc = Starcast.starcast(y, z, radx, checks, plane);
+            r = (a + b + cc) / 3D;
+        } finally {
+            Starcast3DAdapter.release();
+            Starcast3DAdapter.release();
+        }
+        return r;
+    }
+
+    /**
+     * Thread-confined reusable adapter covering the two 3D composition roles:
+     * (a) a plane sampler for {@link Starcast} (one coordinate held fixed) and
+     * (b) a trilinear sampler delegating to a {@link NoiseProvider3}. Pooled in
+     * a per-thread stack so nested 3D interpolations get distinct adapters.
+     */
+    static final class Starcast3DAdapter implements NoiseProvider, NoiseProvider3 {
+        static final int PLANE_X = 2, PLANE_Y = 0, PLANE_Z = 1;
+        private static final ThreadLocal<Pool> POOL = ThreadLocal.withInitial(Pool::new);
+
+        private NoiseProvider3 delegate;
+        private double radx, rady, radz; // trilinear role
+        private double fixed;            // plane role
+        private int plane;               // plane role
+
+        static Starcast3DAdapter acquire() {
+            Pool pool = POOL.get();
+            if (pool.depth >= pool.adapters.length) {
+                Starcast3DAdapter[] grown = new Starcast3DAdapter[pool.adapters.length * 2];
+                System.arraycopy(pool.adapters, 0, grown, 0, pool.adapters.length);
+                pool.adapters = grown;
+            }
+            Starcast3DAdapter a = pool.adapters[pool.depth];
+            if (a == null) {
+                a = new Starcast3DAdapter();
+                pool.adapters[pool.depth] = a;
+            }
+            pool.depth++;
+            return a;
+        }
+
+        static void release() {
+            POOL.get().depth--;
+        }
+
+        void setPlane(NoiseProvider3 delegate, int plane, double fixed) {
+            this.delegate = delegate;
+            this.plane = plane;
+            this.fixed = fixed;
+        }
+
+        void setTrilinear(double radx, double rady, double radz, NoiseProvider3 delegate) {
+            this.radx = radx;
+            this.rady = rady;
+            this.radz = radz;
+            this.delegate = delegate;
+        }
+
+        @Override
+        public double noise(double a, double b) {
+            return switch (plane) {
+                case PLANE_Y -> delegate.noise(a, fixed, b);
+                case PLANE_Z -> delegate.noise(a, b, fixed);
+                default -> delegate.noise(fixed, a, b);
+            };
+        }
+
+        @Override
+        public double noise(double x, double y, double z) {
+            return getTrilinear((int) x, (int) y, (int) z, radx, rady, radz, delegate);
+        }
+
+        private static final class Pool {
+            private Starcast3DAdapter[] adapters = new Starcast3DAdapter[8];
+            private int depth;
+        }
     }
 
     public static double getBilinearBezierNoise(int x, int z, double rad, NoiseProvider n) {
@@ -940,14 +1044,10 @@ public class IrisInterpolation {
             case TRISTARCAST_6 -> getStarcast3D(x, y, z, radx, 6D, n);
             case TRISTARCAST_9 -> getStarcast3D(x, y, z, radx, 9D, n);
             case TRISTARCAST_12 -> getStarcast3D(x, y, z, radx, 12D, n);
-            case TRILINEAR_TRISTARCAST_3 ->
-                    getStarcast3D(x, y, z, radx, 3D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
-            case TRILINEAR_TRISTARCAST_6 ->
-                    getStarcast3D(x, y, z, radx, 6D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
-            case TRILINEAR_TRISTARCAST_9 ->
-                    getStarcast3D(x, y, z, radx, 9D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
-            case TRILINEAR_TRISTARCAST_12 ->
-                    getStarcast3D(x, y, z, radx, 12D, (xx, yy, zz) -> getTrilinear((int) xx, (int) yy, (int) zz, radx, rady, radz, n));
+            case TRILINEAR_TRISTARCAST_3 -> trilinearStarcast3D(x, y, z, radx, rady, radz, 3D, n);
+            case TRILINEAR_TRISTARCAST_6 -> trilinearStarcast3D(x, y, z, radx, rady, radz, 6D, n);
+            case TRILINEAR_TRISTARCAST_9 -> trilinearStarcast3D(x, y, z, radx, rady, radz, 9D, n);
+            case TRILINEAR_TRISTARCAST_12 -> trilinearStarcast3D(x, y, z, radx, rady, radz, 12D, n);
             case NONE -> n.noise(x, y, z);
         };
     }
@@ -1009,21 +1109,21 @@ public class IrisInterpolation {
         } else if (method.equals(InterpolationMethod.STARCAST_12)) {
             r = Starcast.starcast(x, z, h, 12D, n);
         } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_3)) {
-            r = Starcast.starcast(x, z, h, 3D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
+            r = Starcast.starcast(x, z, h, 3D, n.bilinearAdapter.configure(h));
         } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_6)) {
-            r = Starcast.starcast(x, z, h, 6D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
+            r = Starcast.starcast(x, z, h, 6D, n.bilinearAdapter.configure(h));
         } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_9)) {
-            r = Starcast.starcast(x, z, h, 9D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
+            r = Starcast.starcast(x, z, h, 9D, n.bilinearAdapter.configure(h));
         } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_12)) {
-            r = Starcast.starcast(x, z, h, 12D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
+            r = Starcast.starcast(x, z, h, 12D, n.bilinearAdapter.configure(h));
         } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_3)) {
-            r = Starcast.starcast(x, z, h, 3D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
+            r = Starcast.starcast(x, z, h, 3D, n.hermiteAdapter.configure(h));
         } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_6)) {
-            r = Starcast.starcast(x, z, h, 6D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
+            r = Starcast.starcast(x, z, h, 6D, n.hermiteAdapter.configure(h));
         } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_9)) {
-            r = Starcast.starcast(x, z, h, 9D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
+            r = Starcast.starcast(x, z, h, 9D, n.hermiteAdapter.configure(h));
         } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_12)) {
-            r = Starcast.starcast(x, z, h, 12D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
+            r = Starcast.starcast(x, z, h, 12D, n.hermiteAdapter.configure(h));
         } else if (method.equals(InterpolationMethod.BILINEAR_BEZIER)) {
             r = getBilinearBezierNoise(x, z, h, n);
         } else if (method.equals(InterpolationMethod.BILINEAR_PARAMETRIC_2)) {
@@ -1083,6 +1183,41 @@ public class IrisInterpolation {
         private int z0;
         private int stamp;
         private int used;
+        private final BilinearAdapter bilinearAdapter = new BilinearAdapter();
+        private final HermiteAdapter hermiteAdapter = new HermiteAdapter();
+
+        /**
+         * Reusable wrapper for BILINEAR_*_STARCAST branches (replaces the
+         * per-call capturing lambda). Must be configured before each starcast.
+         */
+        private final class BilinearAdapter implements NoiseProvider {
+            double h;
+
+            NoiseProvider configure(double radius) {
+                this.h = radius;
+                return this;
+            }
+
+            @Override
+            public double noise(double x, double z) {
+                return getBilinearNoise((int) x, (int) z, h, InterpolationMemo.this);
+            }
+        }
+
+        /** Reusable wrapper for HERMITE_*_STARCAST branches (tension/bias 0/0). */
+        private final class HermiteAdapter implements NoiseProvider {
+            double h;
+
+            NoiseProvider configure(double radius) {
+                this.h = radius;
+                return this;
+            }
+
+            @Override
+            public double noise(double x, double z) {
+                return getHermiteNoise((int) x, (int) z, h, InterpolationMemo.this, 0D, 0D);
+            }
+        }
 
         static InterpolationMemo acquire(NoiseProvider delegate, int x, int z) {
             Holder h = HOLDER.get();

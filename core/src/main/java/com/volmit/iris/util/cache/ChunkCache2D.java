@@ -7,18 +7,16 @@ import java.lang.invoke.VarHandle;
 
 public class ChunkCache2D<T> {
     private static final boolean FAST = Boolean.getBoolean("iris.cache.fast");
-    private static final boolean DYNAMIC = Boolean.getBoolean("iris.cache.dynamic");
     private static final VarHandle AA = MethodHandles.arrayElementVarHandle(Entry[].class);
 
     private final Entry<T>[] cache;
 
     @SuppressWarnings({"unchecked"})
     public ChunkCache2D() {
+        // Entries are created lazily on first access per cell (the CAS in get()
+        // already owns this path); pre-allocating 256 entries per chunk per
+        // stream burned ~6KB/chunk for cells that are often never read.
         this.cache = new Entry[256];
-        if (DYNAMIC) return;
-        for (int i = 0; i < cache.length; i++) {
-            cache[i] = FAST ? new FastEntry<>() : new Entry<>();
-        }
     }
 
     @SuppressWarnings({"unchecked"})

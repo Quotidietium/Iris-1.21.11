@@ -309,49 +309,40 @@ public class IrisComplex implements DataProvider {
 
         // The hi and lo passes sample the exact same points with the same weights.
         // Compute both sums per visit; the lo sum is stashed in a per-call side
-        // cache keyed by sample position so the second pass never re-samples.
-        HashMap<NoiseKey, double[]> hiLoCache = new HashMap<>(64);
-        double hi = interpolator.interpolate(x, z, (xx, zz) -> {
-            try {
-                double[] sums = hiLoCache.computeIfAbsent(new NoiseKey(xx, zz), k -> {
-                    double h = 0, l = 0;
-                    IrisBiome bx = baseBiomeStream.get(xx, zz);
-                    for (IrisGenerator gen : generators) {
-                        h += bx.getGenLinkMax(gen.getLoadKey(), engine);
-                        l += bx.getGenLinkMin(gen.getLoadKey(), engine);
-                    }
-                    return new double[]{h, l};
-                });
-                return sums[0];
-            } catch (Throwable e) {
-                Iris.reportError(e);
-                e.printStackTrace();
-                Iris.error("Failed to sample hi biome at " + xx + " " + zz + "...");
-            }
-
-            return 0;
-        });
-
-        double lo = interpolator.interpolate(x, z, (xx, zz) -> {
-            try {
-                double[] sums = hiLoCache.get(new NoiseKey(xx, zz));
-                if (sums != null) {
-                    return sums[1];
+        // table keyed by sample position so the second pass never re-samples.
+        // The side table is a thread-confined primitive open-addressing map
+        // (exact double keys, generation-stamped) instead of a HashMap with
+        // boxed keys and pair arrays.
+        HiLoSums sums = HiLoSums.acquire(baseBiomeStream);
+        double hi;
+        double lo;
+        try {
+            hi = interpolator.interpolate(x, z, (xx, zz) -> {
+                try {
+                    return sums.computeHi(xx, zz, generators, engine);
+                } catch (Throwable e) {
+                    Iris.reportError(e);
+                    e.printStackTrace();
+                    Iris.error("Failed to sample hi biome at " + xx + " " + zz + "...");
                 }
-                double l = 0;
-                IrisBiome bx = baseBiomeStream.get(xx, zz);
-                for (IrisGenerator gen : generators) {
-                    l += bx.getGenLinkMin(gen.getLoadKey(), engine);
-                }
-                return l;
-            } catch (Throwable e) {
-                Iris.reportError(e);
-                e.printStackTrace();
-                Iris.error("Failed to sample lo biome at " + xx + " " + zz + "...");
-            }
 
-            return 0;
-        });
+                return 0;
+            });
+
+            lo = interpolator.interpolate(x, z, (xx, zz) -> {
+                try {
+                    return sums.lookupLo(xx, zz, generators, engine);
+                } catch (Throwable e) {
+                    Iris.reportError(e);
+                    e.printStackTrace();
+                    Iris.error("Failed to sample lo biome at " + xx + " " + zz + "...");
+                }
+
+                return 0;
+            });
+        } finally {
+            sums.release();
+        }
 
         double d = 0;
 
@@ -425,5 +416,133 @@ public class IrisComplex implements DataProvider {
 
     public void close() {
 
+    }
+
+    /**
+     * Per-call hi/lo sum memo for {@link #interpolateGenerators}. Thread-confined
+     * stack (reentrant); primitive double keys with a generation stamp; overflow
+     * falls through to direct computation. Values are identical to computing
+     * each sum independently: same iteration order over the same generators.
+     */
+    static final class HiLoSums {
+        private static final int CAPACITY = 64;
+        private static final int MASK = CAPACITY - 1;
+        private static final ThreadLocal<Holder> HOLDER = ThreadLocal.withInitial(Holder::new);
+
+        private final long[] keysX = new long[CAPACITY];
+        private final long[] keysZ = new long[CAPACITY];
+        private final double[] hi = new double[CAPACITY];
+        private final double[] lo = new double[CAPACITY];
+        private final int[] stamps = new int[CAPACITY];
+        private int stamp;
+        private int used;
+        private ProceduralStream<IrisBiome> biomeStream;
+
+        static HiLoSums acquire(ProceduralStream<IrisBiome> biomeStream) {
+            Holder h = HOLDER.get();
+            HiLoSums[] stack = h.stack;
+            if (h.depth >= stack.length) {
+                HiLoSums[] grown = new HiLoSums[stack.length * 2];
+                System.arraycopy(stack, 0, grown, 0, stack.length);
+                h.stack = grown;
+                stack = grown;
+            }
+            HiLoSums m = stack[h.depth];
+            if (m == null) {
+                m = new HiLoSums();
+                stack[h.depth] = m;
+            }
+            h.depth++;
+            m.used = 0;
+            m.biomeStream = biomeStream;
+            if (++m.stamp == 0) {
+                java.util.Arrays.fill(m.stamps, 0);
+                m.stamp = 1;
+            }
+            return m;
+        }
+
+        void release() {
+            HOLDER.get().depth--;
+        }
+
+        double computeHi(double x, double z, Set<IrisGenerator> generators, Engine engine) {
+            int slot = findOrClaim(x, z);
+            if (slot < 0) {
+                return sample(biomeStream.get(x, z), generators, engine, true);
+            }
+            IrisBiome bx = biomeStream.get(x, z);
+            double h = 0, l = 0;
+            for (IrisGenerator gen : generators) {
+                h += bx.getGenLinkMax(gen.getLoadKey(), engine);
+                l += bx.getGenLinkMin(gen.getLoadKey(), engine);
+            }
+            hi[slot] = h;
+            lo[slot] = l;
+            return h;
+        }
+
+        double lookupLo(double x, double z, Set<IrisGenerator> generators, Engine engine) {
+            int slot = find(x, z);
+            if (slot >= 0) {
+                return lo[slot];
+            }
+            return sample(biomeStream.get(x, z), generators, engine, false);
+        }
+
+        private double sample(IrisBiome bx, Set<IrisGenerator> generators, Engine engine, boolean max) {
+            double b = 0;
+            for (IrisGenerator gen : generators) {
+                b += max ? bx.getGenLinkMax(gen.getLoadKey(), engine) : bx.getGenLinkMin(gen.getLoadKey(), engine);
+            }
+            return b;
+        }
+
+        private int find(double x, double z) {
+            long kx = Double.doubleToLongBits(x);
+            long kz = Double.doubleToLongBits(z);
+            int i = mix(kx, kz) & MASK;
+            int s = stamp;
+            int probes = 0;
+            while (stamps[i] == s && probes++ < CAPACITY) {
+                if (keysX[i] == kx && keysZ[i] == kz) {
+                    return i;
+                }
+                i = (i + 1) & MASK;
+            }
+            return -1;
+        }
+
+        private int findOrClaim(double x, double z) {
+            long kx = Double.doubleToLongBits(x);
+            long kz = Double.doubleToLongBits(z);
+            int i = mix(kx, kz) & MASK;
+            int s = stamp;
+            while (stamps[i] == s) {
+                if (keysX[i] == kx && keysZ[i] == kz) {
+                    return i; // already computed this pass
+                }
+                i = (i + 1) & MASK;
+            }
+            if (used >= CAPACITY) {
+                return -1; // table full: compute without memoizing
+            }
+            stamps[i] = s;
+            keysX[i] = kx;
+            keysZ[i] = kz;
+            used++;
+            return i;
+        }
+
+        private static int mix(long a, long b) {
+            long h = a * 0x9E3779B97F4A7C15L;
+            h ^= (h >>> 29) + b * 0xBF58476D1CE4E5B9L;
+            return (int) (h ^ (h >>> 32));
+        }
+
+        private static final class Holder {
+            private HiLoSums[] stack = new HiLoSums[8];
+            private int depth;
+        }
     }
 }

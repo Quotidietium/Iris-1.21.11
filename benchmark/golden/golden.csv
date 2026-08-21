@@ -14,3 +14,5 @@ interp-hermite,fe5449374ed8b3f2,1000000
 worldcache2d,50d7df4049b7c4f,64000000
 rng-column,b3472d2f8e31a39b,2000000
 implode-fitRarity-cached,e2d4d8041748b35e,1000000
+interp3d-trilinear,266d265d6a9b3a5d,1000000
+interp3d-trilinear-starcast6,da1906d4b823a00a,1000000

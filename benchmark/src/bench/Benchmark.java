@@ -6,6 +6,8 @@ import com.volmit.iris.engine.data.cache.Cache;
 import com.volmit.iris.util.cache.WorldCache2D;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.interpolation.InterpolationMethod;
+import com.volmit.iris.util.interpolation.InterpolationMethod3D;
+import com.volmit.iris.util.interpolation.IrisInterpolation;
 import com.volmit.iris.util.math.RNG;
 import com.volmit.iris.util.noise.CNG;
 import com.volmit.iris.util.noise.NoiseType;
@@ -269,6 +271,31 @@ public final class Benchmark {
         out.add(interpScenario("interp-bilinear-starcast6", bilinearStarcast, signature));
         out.add(interpScenario("interp-bilinear", bilinear, signature));
         out.add(interpScenario("interp-hermite", hermite, signature));
+
+        // ---- 3D interpolation (cave carving path) ----
+        com.volmit.iris.util.function.NoiseProvider3 np3 = (x, y, z) -> signature.noise(x, y, z);
+        out.add(sc("interp3d-trilinear", (n, seed, dg) -> {
+            Random r = new Random(seed);
+            double bh = 0;
+            for (int i = 0; i < n; i++) {
+                double v = IrisInterpolation.getNoise3D(InterpolationMethod3D.TRILINEAR,
+                        r.nextInt(100_000) - 50_000, r.nextInt(256), r.nextInt(100_000) - 50_000, 7, np3);
+                dg.add(v);
+                bh += v;
+            }
+            return bh;
+        }));
+        out.add(sc("interp3d-trilinear-starcast6", (n, seed, dg) -> {
+            Random r = new Random(seed);
+            double bh = 0;
+            for (int i = 0; i < n; i++) {
+                double v = IrisInterpolation.getNoise3D(InterpolationMethod3D.TRILINEAR_TRISTARCAST_6,
+                        r.nextInt(100_000) - 50_000, r.nextInt(256), r.nextInt(100_000) - 50_000, 7, np3);
+                dg.add(v);
+                bh += v;
+            }
+            return bh;
+        }));
 
         // ---- WorldCache2D (cache2D stream backing) ----
         WorldCache2D<Integer> cache = new WorldCache2D<>((x, z) -> signature.fit(-100, 100, x, z), 1024);
