@@ -8,11 +8,23 @@ import sys
 
 
 def digests_of(path):
+    """Reads digests. Accepts either a full benchmark CSV (filters iteration 0)
+    or a golden CSV with columns scenario,digest[,samples]."""
     out = {}
     with open(path, newline='', encoding='utf-8') as f:
-        for row in csv.DictReader(f):
-            if row['iteration'] == '0':
-                out[row['scenario']] = (row['digest'], row['samples'])
+        reader = csv.reader(f)
+        header = next(reader)
+        if 'digest' in header and 'iteration' in header:
+            idx = {name: i for i, name in enumerate(header)}
+            for row in reader:
+                if row[idx['iteration']] == '0':
+                    out[row[idx['scenario']]] = (row[idx['digest']], row[idx['samples']])
+        elif 'digest' in header:
+            idx = {name: i for i, name in enumerate(header)}
+            for row in reader:
+                out[row[idx['scenario']]] = (row[idx['digest']], row[idx['samples']] if 'samples' in idx else '?')
+        else:
+            raise SystemExit(f"unrecognized CSV format: {header}")
     return out
 
 

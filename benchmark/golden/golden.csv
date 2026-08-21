@@ -1,0 +1,15 @@
+scenario,digest,samples
+cng-noise2d,43d7608270f13b7c,1000000
+cng-noise3d,6ee58c0971d538b7,1000000
+cng-fractured2d,9b046b9ad9d1a81a,1000000
+cng-perlin2d,b5d5660119ca4363,1000000
+cng-fit-int2d,e19f2fab4e18bb96,1000000
+cng-fitdouble2d,6e6d335ed5bcf72a,1000000
+irare-pick,91e9e7fadb5be35c,1000000
+irare-pick-legacy,8ffcbf387d29966d,1000000
+implode-fitRarity,e2d4d8041748b35e,1000000
+interp-bilinear-starcast6,2849dd819a193025,1000000
+interp-bilinear,5f66401b55d8e1dd,1000000
+interp-hermite,fe5449374ed8b3f2,1000000
+worldcache2d,50d7df4049b7c4f,64000000
+rng-column,b3472d2f8e31a39b,2000000
