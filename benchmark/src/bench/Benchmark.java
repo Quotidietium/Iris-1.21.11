@@ -244,6 +244,24 @@ public final class Benchmark {
             return bh;
         }));
 
+        // ---- IrisComplex.implode AFTER round-1 caching: prebuilt rarity map, per-sample selection only ----
+        KList<FakeRare> cachedMap;
+        {
+            KList<FakeRare> chx = biomes.copy();
+            chx.add(biomes.get(0));
+            cachedMap = CNG.buildRarityMap(chx);
+        }
+        out.add(sc("implode-fitRarity-cached", (n, seed, dg) -> {
+            Random r = new Random(seed);
+            double bh = 0;
+            for (int i = 0; i < n; i++) {
+                FakeRare v = signature.fitRarityMapped(cachedMap, r.nextInt(100_000) - 50_000, r.nextInt(100_000) - 50_000);
+                dg.add(v.id);
+                bh += v.id;
+            }
+            return bh;
+        }));
+
         // ---- Height interpolation (heightStream path) ----
         IrisInterpolator bilinearStarcast = new IrisInterpolator().setFunction(InterpolationMethod.BILINEAR_STARCAST_6);
         IrisInterpolator bilinear = new IrisInterpolator().setFunction(InterpolationMethod.BILINEAR);

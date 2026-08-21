@@ -44,8 +44,8 @@ import java.io.File;
 import java.util.*;
 
 @Data
-@EqualsAndHashCode(exclude = "data")
-@ToString(exclude = "data")
+@EqualsAndHashCode(exclude = {"data", "implodeRarityMaps"})
+@ToString(exclude = {"data", "implodeRarityMaps"})
 public class IrisComplex implements DataProvider {
     private static final BlockData AIR = Material.AIR.createBlockData();
     private RNG rng;
@@ -83,6 +83,7 @@ public class IrisComplex implements DataProvider {
     private ProceduralStream<BlockData> fluidStream;
     private IrisBiome focusBiome;
     private IrisRegion focusRegion;
+    private final java.util.concurrent.ConcurrentHashMap<IrisBiome, KList<IrisBiome>> implodeRarityMaps = new java.util.concurrent.ConcurrentHashMap<>();
 
     public IrisComplex(Engine engine) {
         this(engine, false);
@@ -306,18 +307,22 @@ public class IrisComplex implements DataProvider {
             return 0;
         }
 
-        HashMap<NoiseKey, IrisBiome> cache = new HashMap<>(64);
+        // The hi and lo passes sample the exact same points with the same weights.
+        // Compute both sums per visit; the lo sum is stashed in a per-call side
+        // cache keyed by sample position so the second pass never re-samples.
+        HashMap<NoiseKey, double[]> hiLoCache = new HashMap<>(64);
         double hi = interpolator.interpolate(x, z, (xx, zz) -> {
             try {
-                IrisBiome bx = baseBiomeStream.get(xx, zz);
-                cache.put(new NoiseKey(xx, zz), bx);
-                double b = 0;
-
-                for (IrisGenerator gen : generators) {
-                    b += bx.getGenLinkMax(gen.getLoadKey(), engine);
-                }
-
-                return b;
+                double[] sums = hiLoCache.computeIfAbsent(new NoiseKey(xx, zz), k -> {
+                    double h = 0, l = 0;
+                    IrisBiome bx = baseBiomeStream.get(xx, zz);
+                    for (IrisGenerator gen : generators) {
+                        h += bx.getGenLinkMax(gen.getLoadKey(), engine);
+                        l += bx.getGenLinkMin(gen.getLoadKey(), engine);
+                    }
+                    return new double[]{h, l};
+                });
+                return sums[0];
             } catch (Throwable e) {
                 Iris.reportError(e);
                 e.printStackTrace();
@@ -329,18 +334,16 @@ public class IrisComplex implements DataProvider {
 
         double lo = interpolator.interpolate(x, z, (xx, zz) -> {
             try {
-                IrisBiome bx = cache.get(new NoiseKey(xx, zz));
-                if (bx == null) {
-                    bx = baseBiomeStream.get(xx, zz);
-                    cache.put(new NoiseKey(xx, zz), bx);
+                double[] sums = hiLoCache.get(new NoiseKey(xx, zz));
+                if (sums != null) {
+                    return sums[1];
                 }
-                double b = 0;
-
+                double l = 0;
+                IrisBiome bx = baseBiomeStream.get(xx, zz);
                 for (IrisGenerator gen : generators) {
-                    b += bx.getGenLinkMin(gen.getLoadKey(), engine);
+                    l += bx.getGenLinkMin(gen.getLoadKey(), engine);
                 }
-
-                return b;
+                return l;
             } catch (Throwable e) {
                 Iris.reportError(e);
                 e.printStackTrace();
@@ -399,11 +402,25 @@ public class IrisComplex implements DataProvider {
         }
 
         CNG childCell = b.getChildrenGenerator(rng, 123, b.getChildShrinkFactor());
-        KList<IrisBiome> chx = b.getRealChildren(this).copy();
-        chx.add(b);
-        IrisBiome biome = childCell.fitRarity(chx, x, z);
+        IrisBiome biome = childCell.fitRarityMapped(implodeRarityMap(b), x, z);
         biome.setInferredType(b.getInferredType());
         return implode(biome, x, z, max - 1);
+    }
+
+    /**
+     * Rarity-weighted child selection table for implode(), keyed by parent biome.
+     * The table depends only on the (immutable-after-load) child list and rarities,
+     * so it is built once per biome per IrisComplex instance (rebuilt on hotload).
+     */
+    private KList<IrisBiome> implodeRarityMap(IrisBiome b) {
+        return implodeRarityMaps.computeIfAbsent(b, bb -> {
+            KList<IrisBiome> chx = bb.getRealChildren(this).copy();
+            chx.add(bb);
+            if (chx.size() == 1) {
+                return chx;
+            }
+            return CNG.buildRarityMap(chx);
+        });
     }
 
     public void close() {

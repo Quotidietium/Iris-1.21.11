@@ -352,6 +352,16 @@ public class CNG {
             return b.get(0);
         }
 
+        return fitRarityMapped(buildRarityMap(b), dim);
+    }
+
+    /**
+     * Builds the rarity-weighted, front/back-interleaved selection table used by
+     * {@link #fitRarity(KList, double...)}. Deterministic per input list; callers
+     * on hot paths should cache the result and combine it with
+     * {@link #fitRarityMapped(KList, double...)}.
+     */
+    public static <T extends IRare> KList<T> buildRarityMap(KList<T> b) {
         KList<T> rarityMapped = new KList<>();
         boolean o = false;
         int max = 1;
@@ -374,15 +384,27 @@ public class CNG {
             }
         }
 
-        if (rarityMapped.size() == 1) {
-            return rarityMapped.get(0);
-        }
-
         if (rarityMapped.isEmpty()) {
             throw new RuntimeException("BAD RARITY MAP! RELATED TO: " + b.toString(", or possibly "));
         }
 
+        return rarityMapped;
+    }
+
+    public <T extends IRare> T fitRarityMapped(KList<T> rarityMapped, double... dim) {
+        if (rarityMapped.size() == 1) {
+            return rarityMapped.get(0);
+        }
+
         return fit(rarityMapped, dim);
+    }
+
+    public <T extends IRare> T fitRarityMapped(KList<T> rarityMapped, double x, double z) {
+        if (rarityMapped.size() == 1) {
+            return rarityMapped.get(0);
+        }
+
+        return fit(rarityMapped, x, z);
     }
 
     public <T> T fit(T[] v, double... dim) {
@@ -415,6 +437,24 @@ public class CNG {
         return v.get(0);
     }
 
+    public <T> T fit(List<T> v, double x, double z) {
+        if (v.size() == 0) {
+            return null;
+        }
+
+        if (v.size() == 1) {
+            return v.get(0);
+        }
+
+        try {
+            return v.get(fit(0, v.size() - 1, x, z));
+        } catch (Throwable e) {
+            Iris.reportError(e);
+        }
+
+        return v.get(0);
+    }
+
     public int fit(int min, int max, double... dim) {
         if (min == max) {
             return min;
@@ -423,6 +463,22 @@ public class CNG {
         double noise = noise(dim);
 
         return (int) Math.round(IrisInterpolation.lerp(min, max, noise));
+    }
+
+    public int fit(int min, int max, double x, double z) {
+        if (min == max) {
+            return min;
+        }
+
+        return (int) Math.round(IrisInterpolation.lerp(min, max, noise(x, z)));
+    }
+
+    public int fit(int min, int max, double x, double y, double z) {
+        if (min == max) {
+            return min;
+        }
+
+        return (int) Math.round(IrisInterpolation.lerp(min, max, noise(x, y, z)));
     }
 
     public int fit(double min, double max, double... dim) {
@@ -435,6 +491,22 @@ public class CNG {
         return (int) Math.round(IrisInterpolation.lerp(min, max, noise));
     }
 
+    public int fit(double min, double max, double x, double z) {
+        if (min == max) {
+            return (int) Math.round(min);
+        }
+
+        return (int) Math.round(IrisInterpolation.lerp(min, max, noise(x, z)));
+    }
+
+    public int fit(double min, double max, double x, double y, double z) {
+        if (min == max) {
+            return (int) Math.round(min);
+        }
+
+        return (int) Math.round(IrisInterpolation.lerp(min, max, noise(x, y, z)));
+    }
+
     public double fitDouble(double min, double max, double... dim) {
         if (min == max) {
             return min;
@@ -443,6 +515,22 @@ public class CNG {
         double noise = noise(dim);
 
         return IrisInterpolation.lerp(min, max, noise);
+    }
+
+    public double fitDouble(double min, double max, double x, double z) {
+        if (min == max) {
+            return min;
+        }
+
+        return IrisInterpolation.lerp(min, max, noise(x, z));
+    }
+
+    public double fitDouble(double min, double max, double x, double y, double z) {
+        if (min == max) {
+            return min;
+        }
+
+        return IrisInterpolation.lerp(min, max, noise(x, y, z));
     }
 
     private double getNoise(double... dim) {
@@ -469,6 +557,57 @@ public class CNG {
         return generator.noise(x * scale, y * scale, z * scale) * opacity;
     }
 
+    private double getNoise1(double x0) {
+        double scale = noscale ? 1 : this.bakedScale * this.scale;
+
+        if (fracture == null || noscale) {
+            return generator.noise(x0 * scale, 0D, 0D) * opacity;
+        }
+
+        if (fracture.isTrueFracturing()) {
+            double x = x0 + ((fracture.noise(x0) - 0.5) * fscale);
+            return generator.noise(x * scale, 0D, 0D) * opacity;
+        }
+
+        double f = fracture.noise(x0) * fscale;
+        return generator.noise((x0 + f) * scale, 0D, 0D) * opacity;
+    }
+
+    private double getNoise2(double x0, double z0) {
+        double scale = noscale ? 1 : this.bakedScale * this.scale;
+
+        if (fracture == null || noscale) {
+            return generator.noise(x0 * scale, z0 * scale, 0D) * opacity;
+        }
+
+        if (fracture.isTrueFracturing()) {
+            double x = x0 + ((fracture.noise(x0, z0) - 0.5) * fscale);
+            double y = z0 + ((fracture.noise(z0, x0) - 0.5) * fscale);
+            return generator.noise(x * scale, y * scale, 0D) * opacity;
+        }
+
+        double f = fracture.noise(x0, z0) * fscale;
+        return generator.noise((x0 + f) * scale, (z0 - f) * scale, 0D) * opacity;
+    }
+
+    private double getNoise3(double x0, double y0, double z0) {
+        double scale = noscale ? 1 : this.bakedScale * this.scale;
+
+        if (fracture == null || noscale) {
+            return generator.noise(x0 * scale, y0 * scale, z0 * scale) * opacity;
+        }
+
+        if (fracture.isTrueFracturing()) {
+            double x = x0 + ((fracture.noise(x0, y0, z0) - 0.5) * fscale);
+            double y = y0 + ((fracture.noise(y0, x0) - 0.5) * fscale);
+            double z = z0 + ((fracture.noise(z0, x0, y0) - 0.5) * fscale);
+            return generator.noise(x * scale, y * scale, z * scale) * opacity;
+        }
+
+        double f = fracture.noise(x0, y0, z0) * fscale;
+        return generator.noise((x0 + f) * scale, (y0 - f) * scale, (z0 - f) * scale) * opacity;
+    }
+
     public double invertNoise(double... dim) {
         if (dim.length == 1) {
             return noise(-dim[0]);
@@ -490,14 +629,65 @@ public class CNG {
             return cache.get((int) dim[0], (int) dim[1]);
         }
 
-        double n = getNoise(dim);
-        n = power != 1D ? (n < 0 ? -Math.pow(Math.abs(n), power) : Math.pow(n, power)) : n;
+        return postNoise(getNoise(dim), dim);
+    }
+
+    public double noise(double x) {
+        double n = powerTransform(getNoise1(x));
+        if (children == null) {
+            return (n - down + up) * patch;
+        }
         double m = 1;
-        hits += oct;
+        for (CNG i : children) {
+            double[] r = injector.combine(n, i.noise(x));
+            n = r[0];
+            m += r[1];
+        }
+        return ((n / m) - down + up) * patch;
+    }
+
+    public double noise(double x, double z) {
+        if (cache != null) {
+            return cache.get((int) x, (int) z);
+        }
+        double n = powerTransform(getNoise2(x, z));
+        if (children == null) {
+            return (n - down + up) * patch;
+        }
+        double m = 1;
+        for (CNG i : children) {
+            double[] r = injector.combine(n, i.noise(x, z));
+            n = r[0];
+            m += r[1];
+        }
+        return ((n / m) - down + up) * patch;
+    }
+
+    public double noise(double x, double y, double z) {
+        double n = powerTransform(getNoise3(x, y, z));
+        if (children == null) {
+            return (n - down + up) * patch;
+        }
+        double m = 1;
+        for (CNG i : children) {
+            double[] r = injector.combine(n, i.noise(x, y, z));
+            n = r[0];
+            m += r[1];
+        }
+        return ((n / m) - down + up) * patch;
+    }
+
+    private double powerTransform(double n) {
+        return power != 1D ? (n < 0 ? -Math.pow(Math.abs(n), power) : Math.pow(n, power)) : n;
+    }
+
+    private double postNoise(double n, double[] dim) {
+        n = powerTransform(n);
         if (children == null) {
             return (n - down + up) * patch;
         }
 
+        double m = 1;
         for (CNG i : children) {
             double[] r = injector.combine(n, i.noise(dim));
             n = r[0];

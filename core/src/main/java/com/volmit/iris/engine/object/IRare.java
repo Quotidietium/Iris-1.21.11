@@ -25,20 +25,108 @@ import com.volmit.iris.util.stream.interpolation.Interpolated;
 import java.util.List;
 
 public interface IRare {
-    static <T extends IRare> ProceduralStream<T> stream(ProceduralStream<Double> noise, List<T> possibilities, boolean legacyRarity) {
-        return ProceduralStream.of(legacyRarity ? (x, z) -> pickLegacy(possibilities, noise.get(x, z)) : (x, z) -> pick(possibilities, noise.get(x, z)),
-                legacyRarity ? (x, y, z) -> pickLegacy(possibilities, noise.get(x, y, z)) : (x, y, z) -> pick(possibilities, noise.get(x, y, z)),
-                new Interpolated<T>() {
-                    @Override
-                    public double toDouble(T t) {
-                        return 0;
-                    }
+    /**
+     * Shared no-op interpolation helper for rarity selection streams (selection
+     * results are discrete and must never be interpolated).
+     */
+    Interpolated<IRare> SELECTOR = new Interpolated<IRare>() {
+        @Override
+        public double toDouble(IRare t) {
+            return 0;
+        }
 
-                    @Override
-                    public T fromDouble(double d) {
-                        return null;
-                    }
-                });
+        @Override
+        public IRare fromDouble(double d) {
+            return null;
+        }
+    };
+
+    static <T extends IRare> ProceduralStream<T> stream(ProceduralStream<Double> noise, List<T> possibilities, boolean legacyRarity) {
+        RareTable<T> table = new RareTable<>(possibilities);
+        @SuppressWarnings("unchecked") Interpolated<T> selector = (Interpolated<T>) (Interpolated<?>) SELECTOR;
+        if (legacyRarity) {
+            return ProceduralStream.of(
+                    (x, z) -> table.pickLegacy(noise.get(x, z)),
+                    (x, y, z) -> table.pickLegacy(noise.get(x, y, z)),
+                    selector);
+        }
+        return ProceduralStream.of(
+                (x, z) -> table.pick(noise.get(x, z)),
+                (x, y, z) -> table.pick(noise.get(x, y, z)),
+                selector);
+    }
+
+    /**
+     * Precomputed selection table for one fixed possibility list. Mirrors the
+     * exact arithmetic order of {@link #pick(List, double)} and
+     * {@link #pickLegacy(List, double)} (the weights are the very same
+     * divisions, computed once), so selections are bit-identical while avoiding
+     * per-sample divisions and iterator overhead.
+     */
+    final class RareTable<T extends IRare> {
+        private final T[] items;
+        private final double[] reciprocals;
+        private final double totalReciprocal;
+        private final int[] rarities;
+        private final int totalRarity;
+
+        @SuppressWarnings("unchecked")
+        RareTable(List<T> possibilities) {
+            this.items = (T[]) possibilities.toArray(new IRare[0]);
+            this.reciprocals = new double[items.length];
+            this.rarities = new int[items.length];
+            double totalR = 0;
+            int totalW = 0;
+            for (int i = 0; i < items.length; i++) {
+                reciprocals[i] = 1d / items[i].getRarity();
+                totalR += reciprocals[i];
+                rarities[i] = items[i].getRarity();
+                totalW += rarities[i];
+            }
+            this.totalReciprocal = totalR;
+            this.totalRarity = totalW;
+        }
+
+        public T pick(double noiseValue) {
+            if (items.length == 0) {
+                return null;
+            }
+
+            if (items.length == 1) {
+                return items[0];
+            }
+
+            double threshold = totalReciprocal * noiseValue;
+            double buffer = 0;
+            for (int i = 0; i < items.length; i++) {
+                buffer += reciprocals[i];
+                if (buffer >= threshold) {
+                    return items[i];
+                }
+            }
+
+            return items[items.length - 1];
+        }
+
+        public T pickLegacy(double noiseValue) {
+            if (items.length == 0) {
+                return null;
+            }
+
+            if (items.length == 1) {
+                return items[0];
+            }
+            double threshold = totalRarity * (items.length - 1) * noiseValue;
+            int buffer = 0;
+            for (int i = 0; i < items.length; i++) {
+                buffer += totalRarity - rarities[i];
+
+                if (buffer >= threshold) {
+                    return items[i];
+                }
+            }
+            return items[items.length - 1];
+        }
     }
 
 

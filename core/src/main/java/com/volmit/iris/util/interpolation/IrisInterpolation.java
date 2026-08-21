@@ -974,7 +974,6 @@ public class IrisInterpolation {
      */
     public static Hunk<Double> getNoise3D(InterpolationMethod3D method, int xo, int yo, int zo, int w, int h, int d, double radX, double radY, double radZ, NoiseProvider3 n) {
         Hunk<Double> hunk = Hunk.newAtomicDoubleHunk(w, h, d);
-        HashMap<Integer, Double> cache = new HashMap<>();
         int i, j, k;
 
         for (i = 0; i < w; i++) {
@@ -983,9 +982,7 @@ public class IrisInterpolation {
                 int fj = j;
                 for (k = 0; k < d; k++) {
                     int fk = k;
-                    hunk.set(i, j, k, cache.computeIfAbsent((k * w * h) + (j * w) + i, (p)
-                            -> getNoise3D(method, fi + xo, fj + yo, fk + zo,
-                            radX, radY, radZ, n)));
+                    hunk.set(i, j, k, getNoise3D(method, fi + xo, fj + yo, fk + zo, radX, radY, radZ, n));
                 }
             }
         }
@@ -998,64 +995,163 @@ public class IrisInterpolation {
     }
 
     public static double getNoise(InterpolationMethod method, int x, int z, double h, NoiseProvider noise) {
-        HashMap<NoiseKey, Double> cache = new HashMap<>(64);
-        NoiseProvider n = (x1, z1) -> cache.computeIfAbsent(new NoiseKey(x1 - x, z1 - z), k -> noise.noise(x1, z1));
-
+        InterpolationMemo n = InterpolationMemo.acquire(noise, x, z);
+        double r;
+        try {
         if (method.equals(InterpolationMethod.BILINEAR)) {
-            return getBilinearNoise(x, z, h, n);
+            r = getBilinearNoise(x, z, h, n);
         } else if (method.equals(InterpolationMethod.STARCAST_3)) {
-            return Starcast.starcast(x, z, h, 3D, n);
+            r = Starcast.starcast(x, z, h, 3D, n);
         } else if (method.equals(InterpolationMethod.STARCAST_6)) {
-            return Starcast.starcast(x, z, h, 6D, n);
+            r = Starcast.starcast(x, z, h, 6D, n);
         } else if (method.equals(InterpolationMethod.STARCAST_9)) {
-            return Starcast.starcast(x, z, h, 9D, n);
+            r = Starcast.starcast(x, z, h, 9D, n);
         } else if (method.equals(InterpolationMethod.STARCAST_12)) {
-            return Starcast.starcast(x, z, h, 12D, n);
+            r = Starcast.starcast(x, z, h, 12D, n);
         } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_3)) {
-            return Starcast.starcast(x, z, h, 3D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
+            r = Starcast.starcast(x, z, h, 3D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
         } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_6)) {
-            return Starcast.starcast(x, z, h, 6D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
+            r = Starcast.starcast(x, z, h, 6D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
         } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_9)) {
-            return Starcast.starcast(x, z, h, 9D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
+            r = Starcast.starcast(x, z, h, 9D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
         } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_12)) {
-            return Starcast.starcast(x, z, h, 12D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
+            r = Starcast.starcast(x, z, h, 12D, (xx, zz) -> getBilinearNoise((int) xx, (int) zz, h, n));
         } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_3)) {
-            return Starcast.starcast(x, z, h, 3D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
+            r = Starcast.starcast(x, z, h, 3D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
         } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_6)) {
-            return Starcast.starcast(x, z, h, 6D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
+            r = Starcast.starcast(x, z, h, 6D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
         } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_9)) {
-            return Starcast.starcast(x, z, h, 9D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
+            r = Starcast.starcast(x, z, h, 9D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
         } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_12)) {
-            return Starcast.starcast(x, z, h, 12D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
+            r = Starcast.starcast(x, z, h, 12D, (xx, zz) -> getHermiteNoise((int) xx, (int) zz, h, n, 0D, 0D));
         } else if (method.equals(InterpolationMethod.BILINEAR_BEZIER)) {
-            return getBilinearBezierNoise(x, z, h, n);
+            r = getBilinearBezierNoise(x, z, h, n);
         } else if (method.equals(InterpolationMethod.BILINEAR_PARAMETRIC_2)) {
-            return getBilinearParametricNoise(x, z, h, n, 2);
+            r = getBilinearParametricNoise(x, z, h, n, 2);
         } else if (method.equals(InterpolationMethod.BILINEAR_PARAMETRIC_4)) {
-            return getBilinearParametricNoise(x, z, h, n, 4);
+            r = getBilinearParametricNoise(x, z, h, n, 4);
         } else if (method.equals(InterpolationMethod.BILINEAR_PARAMETRIC_1_5)) {
-            return getBilinearParametricNoise(x, z, h, n, 1.5);
+            r = getBilinearParametricNoise(x, z, h, n, 1.5);
         } else if (method.equals(InterpolationMethod.BICUBIC)) {
-            return getBilinearNoise(x, z, h, n);
+            r = getBilinearNoise(x, z, h, n);
         } else if (method.equals(InterpolationMethod.HERMITE)) {
-            return getHermiteNoise(x, z, h, n);
+            r = getHermiteNoise(x, z, h, n);
         } else if (method.equals(InterpolationMethod.HERMITE_TENSE)) {
-            return getHermiteNoise(x, z, h, n, 0.8D, 0D);
+            r = getHermiteNoise(x, z, h, n, 0.8D, 0D);
         } else if (method.equals(InterpolationMethod.CATMULL_ROM_SPLINE)) {
-            return getHermiteNoise(x, z, h, n, 1D, 0D);
+            r = getHermiteNoise(x, z, h, n, 1D, 0D);
         } else if (method.equals(InterpolationMethod.HERMITE_LOOSE)) {
-            return getHermiteNoise(x, z, h, n, 0D, 0D);
+            r = getHermiteNoise(x, z, h, n, 0D, 0D);
         } else if (method.equals(InterpolationMethod.HERMITE_LOOSE_HALF_NEGATIVE_BIAS)) {
-            return getHermiteNoise(x, z, h, n, 0D, -0.5D);
+            r = getHermiteNoise(x, z, h, n, 0D, -0.5D);
         } else if (method.equals(InterpolationMethod.HERMITE_LOOSE_HALF_POSITIVE_BIAS)) {
-            return getHermiteNoise(x, z, h, n, 0D, 0.5D);
+            r = getHermiteNoise(x, z, h, n, 0D, 0.5D);
         } else if (method.equals(InterpolationMethod.HERMITE_LOOSE_FULL_NEGATIVE_BIAS)) {
-            return getHermiteNoise(x, z, h, n, 0D, -1D);
+            r = getHermiteNoise(x, z, h, n, 0D, -1D);
         } else if (method.equals(InterpolationMethod.HERMITE_LOOSE_FULL_POSITIVE_BIAS)) {
-            return getHermiteNoise(x, z, h, n, 0D, 1D);
+            r = getHermiteNoise(x, z, h, n, 0D, 1D);
+        } else {
+            r = n.noise(x, z);
+        }
+        } finally {
+            n.release();
+        }
+        return r;
+    }
+
+    /**
+     * Per-call memoizer that replaces the original HashMap&lt;NoiseKey, Double&gt;
+     * (one map + boxed keys/values per interpolation). Same key semantics:
+     * deduplicates delegate samples by exact (x - x0, z - z0) offset within a
+     * single getNoise call. Thread-confined via a per-thread stack of memos so
+     * nested getNoise calls (e.g. height interpolation whose delegate samples
+     * another interpolated stream) each get their own memo; no allocation on
+     * the hot path once warmed. Falls back to direct delegation if the table
+     * overflows (identical results, just no reuse).
+     */
+    static final class InterpolationMemo implements NoiseProvider {
+        private static final int CAPACITY = 64;
+        private static final int MASK = CAPACITY - 1;
+        private static final ThreadLocal<Holder> HOLDER = ThreadLocal.withInitial(Holder::new);
+
+        private final long[] keysX = new long[CAPACITY];
+        private final long[] keysZ = new long[CAPACITY];
+        private final double[] values = new double[CAPACITY];
+        private final int[] stamps = new int[CAPACITY];
+        private NoiseProvider delegate;
+        private int x0;
+        private int z0;
+        private int stamp;
+        private int used;
+
+        static InterpolationMemo acquire(NoiseProvider delegate, int x, int z) {
+            Holder h = HOLDER.get();
+            InterpolationMemo[] stack = h.stack;
+            if (h.depth >= stack.length) {
+                stack = java.util.Arrays.copyOf(stack, stack.length * 2);
+                h.stack = stack;
+            }
+            InterpolationMemo m = stack[h.depth];
+            if (m == null) {
+                m = new InterpolationMemo();
+                stack[h.depth] = m;
+            }
+            h.depth++;
+            m.delegate = delegate;
+            m.x0 = x;
+            m.z0 = z;
+            m.used = 0;
+            if (++m.stamp == 0) {
+                java.util.Arrays.fill(m.stamps, 0);
+                m.stamp = 1;
+            }
+            return m;
         }
 
-        return n.noise(x, z);
+        void release() {
+            delegate = null;
+            HOLDER.get().depth--;
+        }
+
+        @Override
+        public double noise(double x, double z) {
+            long kx = Double.doubleToLongBits(x - x0);
+            long kz = Double.doubleToLongBits(z - z0);
+            int i = mix(kx, kz) & MASK;
+            int s = stamp;
+
+            while (true) {
+                if (stamps[i] != s) {
+                    if (used >= CAPACITY) {
+                        return delegate.noise(x, z);
+                    }
+                    double v = delegate.noise(x, z);
+                    stamps[i] = s;
+                    keysX[i] = kx;
+                    keysZ[i] = kz;
+                    values[i] = v;
+                    used++;
+                    return v;
+                }
+
+                if (keysX[i] == kx && keysZ[i] == kz) {
+                    return values[i];
+                }
+
+                i = (i + 1) & MASK;
+            }
+        }
+
+        private static int mix(long a, long b) {
+            long h = a * 0x9E3779B97F4A7C15L;
+            h ^= (h >>> 29) + b * 0xBF58476D1CE4E5B9L;
+            return (int) (h ^ (h >>> 32));
+        }
+
+        private static final class Holder {
+            private InterpolationMemo[] stack = new InterpolationMemo[8];
+            private int depth;
+        }
     }
 
     public static double rangeScale(double amin, double amax, double bmin, double bmax, double b) {
