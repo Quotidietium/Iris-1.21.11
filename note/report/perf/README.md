@@ -1,0 +1,13 @@
+# 性能报告索引（note/report/perf）
+
+| 报告 | 内容 |
+|------|------|
+| [round0-baseline.md](round0-baseline.md) | 基线测量 + 代码级热点证据 + 方法论 |
+| [round1-cpu-hotpath.md](round1-cpu-hotpath.md) | CPU 热点：CNG 定参/插值备忘/implode 缓存（11.4×）|
+| [round2-memory.md](round2-memory.md) | 内存/分配：合计 -75.2%，3D 0 B/op |
+| [round3-concurrency.md](round3-concurrency.md) | 并发/共享缓存：Caffeine、并行扩展 2.3×→3.6× |
+
+- 原始数据：`benchmark/results/round*.csv`（每场景 5 次测量）
+- 金样本：`benchmark/golden/golden.csv`（20 场景固定种子摘要，行为一致性的判定基准）
+- 复现：`bash benchmark/build.sh && bash benchmark/run.sh <csv> 3 5 && bash benchmark/verify.sh benchmark/golden/golden.csv <csv>`
+- 版本改动汇总：[../../release/3.9.3-1.20.1-1.21.11.md](../../release/3.9.3-1.20.1-1.21.11.md)
