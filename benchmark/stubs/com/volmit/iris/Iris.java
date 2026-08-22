@@ -61,12 +61,53 @@ public class Iris extends com.volmit.iris.util.plugin.VolmitPlugin {
     public static void callEvent(Event e) {
     }
 
+    /**
+     * Offline classpath scan: finds classes in package {@code s} (compilation
+     * output directory) carrying the annotation, mirroring the real plugin's
+     * package initializer. Used by IrisMatter.buildSlicers() to discover the
+     * matter slices without a plugin runtime.
+     */
     public static KList<Object> initialize(String s, Class<? extends java.lang.annotation.Annotation> slicedClass) {
-        throw new UnsupportedOperationException("stub");
+        KList<Object> instances = new KList<>();
+        for (Class<?> c : getClasses(s, slicedClass)) {
+            try {
+                instances.add(c.getDeclaredConstructor().newInstance());
+            } catch (Throwable e) {
+                throw new RuntimeException("Failed to initialize " + c, e);
+            }
+        }
+        return instances;
     }
 
     public static KList<Class<?>> getClasses(String s, Class<? extends java.lang.annotation.Annotation> slicedClass) {
-        throw new UnsupportedOperationException("stub");
+        KList<Class<?>> classes = new KList<>();
+        try {
+            String path = s.replace('.', '/');
+            java.util.Enumeration<java.net.URL> resources =
+                    Iris.class.getClassLoader().getResources(path);
+            while (resources.hasMoreElements()) {
+                java.net.URL url = resources.nextElement();
+                if (!"file".equals(url.getProtocol())) {
+                    continue;
+                }
+                File dir = new File(url.toURI());
+                String[] files = dir.list((d, n) -> n.endsWith(".class") && !n.contains("$"));
+                if (files == null) {
+                    continue;
+                }
+                for (String f : files) {
+                    String cn = s + "." + f.substring(0, f.length() - ".class".length());
+                    Class<?> c = Class.forName(cn, false, Iris.class.getClassLoader());
+                    if (c.isAnnotationPresent(slicedClass)
+                            && !java.lang.reflect.Modifier.isAbstract(c.getModifiers())) {
+                        classes.add(c);
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            throw new RuntimeException("Offline package scan failed for " + s, e);
+        }
+        return classes;
     }
 
     public static KList<Object> initialize(String s) {

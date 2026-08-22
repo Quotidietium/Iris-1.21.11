@@ -3,6 +3,7 @@ package bench;
 import com.volmit.iris.core.loader.IrisData;
 import com.volmit.iris.engine.actuator.TerrainColumn;
 import com.volmit.iris.engine.object.IrisBiome;
+import com.volmit.iris.engine.object.IrisCompat;
 import com.volmit.iris.engine.object.IrisDimension;
 import com.volmit.iris.engine.object.IrisOreGenerator;
 import com.volmit.iris.engine.object.IRare;
@@ -12,15 +13,30 @@ import com.volmit.iris.engine.object.IrisRange;
 import com.volmit.iris.engine.data.cache.Cache;
 import com.volmit.iris.util.cache.WorldCache2D;
 import com.volmit.iris.util.collection.KList;
+import com.volmit.iris.util.data.B;
 import com.volmit.iris.util.interpolation.InterpolationMethod;
 import com.volmit.iris.util.interpolation.InterpolationMethod3D;
 import com.volmit.iris.util.interpolation.IrisInterpolation;
 import com.volmit.iris.util.hunk.Hunk;
+import com.volmit.iris.util.hunk.bits.DataContainer;
+import com.volmit.iris.util.hunk.bits.Writable;
+import com.volmit.iris.util.io.CountingDataInputStream;
+import com.volmit.iris.util.mantle.MantleChunk;
 import com.volmit.iris.util.math.RNG;
+import com.volmit.iris.util.matter.IrisMatter;
+import com.volmit.iris.util.matter.Matter;
+import com.volmit.iris.util.matter.MatterSlice;
 import com.volmit.iris.util.noise.CNG;
 import com.volmit.iris.util.noise.NoiseType;
+import com.volmit.iris.util.parallel.HyperLock;
 import com.volmit.iris.util.stream.ProceduralStream;
+import org.bukkit.Material;
+import org.bukkit.block.data.BlockData;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.PrintWriter;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
@@ -102,6 +118,10 @@ public final class Benchmark {
     public static void main(String[] args) throws Exception {
         // Real IrisSettings.get() touches the plugin data folder; pre-seed defaults.
         com.volmit.iris.core.IrisSettings.settings = new com.volmit.iris.core.IrisSettings();
+        // BlockData compat filter chain (B.get("minecraft:...") routes through it;
+        // its first action is a B.getOrNull cache probe, so the proxy factory
+        // underneath answers immediately).
+        com.volmit.iris.Iris.compat = new IrisCompat();
         String out = args.length > 0 ? args[0] : "benchmark/results/latest.csv";
         int warmups = args.length > 1 ? Integer.parseInt(args[1]) : 3;
         int iters = args.length > 2 ? Integer.parseInt(args[2]) : 5;
@@ -112,7 +132,7 @@ public final class Benchmark {
             w.println("scenario,iteration,seed,ops,ns_per_op,bytes_per_op,digest,samples");
             for (Scenario s : scenarios) {
                 for (int i = 0; i < warmups; i++) {
-                    s.run(200_000, 424242L + i, new Digest());
+                    s.run(Math.min(200_000, s.ops()), 424242L + i, new Digest());
                 }
                 for (int it = 0; it < iters; it++) {
                     long seed = 900_000L + it;
@@ -578,6 +598,214 @@ public final class Benchmark {
             }
             return bh;
         }));
+
+        // ---- Matter/Mantle storage layer (offline via Bukkit proxy stub) ----
+        // Round 7 surface: palette-backed per-section storage (DataContainer),
+        // the MantleChunk block-write chain, Matter serialize/deserialize
+        // roundtrip, and HyperLock. All digests are deterministic so every
+        // iteration doubles as a correctness proof (roundtrip content identity,
+        // exact mutual-exclusion counters).
+        {
+            final BlockData[] protos;
+            {
+                Material[] mats = {Material.STONE, Material.DIRT, Material.GRASS_BLOCK,
+                        Material.SAND, Material.OAK_LOG, Material.GRAVEL,
+                        Material.COBBLESTONE, Material.ANDESITE};
+                protos = new BlockData[mats.length];
+                for (int i = 0; i < mats.length; i++) {
+                    protos[i] = mats[i].createBlockData();
+                }
+            }
+
+            // Palette node adapter mirroring BlockMatter.writeNode/readNode.
+            final Writable<BlockData> bdWritable = new Writable<>() {
+                @Override
+                public BlockData readNodeData(DataInputStream din) throws java.io.IOException {
+                    return B.get(din.readUTF());
+                }
+
+                @Override
+                public void writeNodeData(DataOutputStream dos, BlockData t) throws java.io.IOException {
+                    dos.writeUTF(t.getAsString());
+                }
+            };
+
+            DataContainer<BlockData> dc = new DataContainer<>(bdWritable, 4096);
+            out.add(sc("datacontainer-set", (n, seed, dg) -> {
+                Random r = new Random(seed);
+                double bh = 0;
+                for (int i = 0; i < n; i++) {
+                    BlockData v = protos[r.nextInt(protos.length)];
+                    dc.set(r.nextInt(4096), v);
+                    dg.add(v.getMaterial().ordinal());
+                    bh += v.getMaterial().ordinal();
+                }
+                return bh;
+            }));
+
+            DataContainer<BlockData> dcGet = new DataContainer<>(bdWritable, 4096);
+            for (int i = 0; i < 4096; i++) {
+                dcGet.set(i, protos[i % protos.length]);
+            }
+            out.add(sc("datacontainer-get", (n, seed, dg) -> {
+                Random r = new Random(seed);
+                double bh = 0;
+                for (int i = 0; i < n; i++) {
+                    BlockData v = dcGet.get(r.nextInt(4096));
+                    int o = v == null ? -1 : v.getMaterial().ordinal();
+                    dg.add(o);
+                    bh += o;
+                }
+                return bh;
+            }));
+
+            // Inner block-write chain used by Mantle.set / MantleWriter.setData:
+            // section array CAS-read + slice map lookup + palette hunk set.
+            MantleChunk mchunk = new MantleChunk(16, 0, 0);
+            out.add(sc("mantlechunk-set", (n, seed, dg) -> {
+                Random r = new Random(seed);
+                double bh = 0;
+                for (int i = 0; i < n; i++) {
+                    int x = r.nextInt(16), y = r.nextInt(256), z = r.nextInt(16);
+                    BlockData v = protos[r.nextInt(protos.length)];
+                    mchunk.getOrCreate(y >> 4)
+                            .slice(BlockData.class)
+                            .set(x, y & 15, z, v);
+                    dg.add(v.getMaterial().ordinal());
+                    bh += v.getMaterial().ordinal();
+                }
+                return bh;
+            }));
+
+            // Full Matter serialize -> deserialize roundtrip of one 16^3 section
+            // (block slice ~2/3 filled + int slice), digesting the read-back
+            // content: proves format identity every iteration.
+            out.add(new Scenario() {
+                @Override
+                public String name() {
+                    return "matter-roundtrip";
+                }
+
+                @Override
+                public int ops() {
+                    return 1_000;
+                }
+
+                @Override
+                public double run(int n, long seed, Digest dg) {
+                    double bh = 0;
+                    for (int i = 0; i < n; i++) {
+                        try {
+                            IrisMatter m = new IrisMatter(16, 16, 16);
+                            MatterSlice<BlockData> bs = m.slice(BlockData.class);
+                            MatterSlice<Integer> is = m.slice(Integer.class);
+                            Random r = new Random(seed);
+                            for (int j = 0; j < 4096; j++) {
+                                if (r.nextInt(3) > 0) {
+                                    bs.setRaw(r.nextInt(16), r.nextInt(16), r.nextInt(16),
+                                            protos[r.nextInt(protos.length)]);
+                                }
+                                is.setRaw(r.nextInt(16), r.nextInt(16), r.nextInt(16), r.nextInt(100));
+                            }
+                            ByteArrayOutputStream bytes = new ByteArrayOutputStream(8192);
+                            m.writeDos(new DataOutputStream(bytes));
+                            Matter m2 = Matter.readDin(CountingDataInputStream.wrap(
+                                    new ByteArrayInputStream(bytes.toByteArray())));
+                            dg.add(bytes.size());
+                            bh += bytes.size();
+                            MatterSlice<BlockData> bs2 = m2.slice(BlockData.class);
+                            MatterSlice<Integer> is2 = m2.slice(Integer.class);
+                            for (int x = 0; x < 16; x++) {
+                                for (int y = 0; y < 16; y++) {
+                                    for (int z = 0; z < 16; z++) {
+                                        BlockData v = bs2.get(x, y, z);
+                                        dg.add(v == null ? -1 : v.getMaterial().ordinal());
+                                        Integer iv = is2.get(x, y, z);
+                                        dg.add(iv == null ? -1 : iv);
+                                    }
+                                }
+                            }
+                        } catch (java.io.IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                    return bh;
+                }
+            });
+
+            // HyperLock: hit-pattern lock/unlock through with(x, z, runnable)
+            // (region keys repeat, like Mantle region locking in production).
+            HyperLock hl = new HyperLock(1024);
+            out.add(sc("hyperlock-hit", (n, seed, dg) -> {
+                Random r = new Random(seed);
+                long[] counter = {0};
+                double bh = 0;
+                for (int i = 0; i < n; i++) {
+                    int x = r.nextInt(64) - 32, z = r.nextInt(64) - 32;
+                    hl.with(x, z, () -> counter[0]++);
+                }
+                dg.add(counter[0]);
+                bh += counter[0];
+                return bh;
+            }));
+
+            // 8 workers all locking the same 64 keys. HyperLock's contract is
+            // PER-KEY exclusion (different keys may proceed concurrently), so
+            // each key guards its own cell: cell[k]++ under with(k, ...) is
+            // exact only if same-key critical sections never overlap. The
+            // coordinator folds each cell after join (worker RNG sequences are
+            // seed-fixed, so every cell value is deterministic) — digest =
+            // per-key exclusion proof. Additionally stripes collide (8 keys,
+            // striped pool), exercising the collision path.
+            HyperLock hlContended = new HyperLock(1024);
+            out.add(new Scenario() {
+                @Override
+                public String name() {
+                    return "par-hyperlock-contended";
+                }
+
+                @Override
+                public int ops() {
+                    return 150_000;
+                }
+
+                @Override
+                public double run(int n, long seed, Digest dg) {
+                    final long[] cells = new long[8];
+                    java.util.concurrent.Future<Long>[] futures = new java.util.concurrent.Future[8];
+                    try {
+                        for (int t = 0; t < 8; t++) {
+                            final long tSeed = seed + t;
+                            futures[t] = PARALLEL_POOL.submit(() -> {
+                                Random r = new Random(tSeed);
+                                long local = 0;
+                                for (int i = 0; i < n; i++) {
+                                    int k = r.nextInt(8);
+                                    hlContended.with(k, 0, () -> {
+                                        long v = cells[k];
+                                        v++;
+                                        cells[k] = v;
+                                    });
+                                    local++;
+                                }
+                                return local;
+                            });
+                        }
+                        double bh = 0;
+                        for (int t = 0; t < 8; t++) {
+                            dg.add(futures[t].get());
+                        }
+                        for (int k = 0; k < 8; k++) {
+                            dg.add(cells[k]);
+                            bh += cells[k];
+                        }
+                        return bh;
+                    } catch (java.util.concurrent.ExecutionException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        }
 
         return out;
     }
