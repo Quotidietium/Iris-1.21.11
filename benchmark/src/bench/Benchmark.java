@@ -786,6 +786,36 @@ public final class Benchmark {
                         return bh;
                     }
                 });
+                final com.volmit.iris.engine.object.IrisObjectPlacement stiltPlacement =
+                        new com.volmit.iris.engine.object.IrisObjectPlacement()
+                                .setMode(com.volmit.iris.engine.object.ObjectPlaceMode.STILT);
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "object-place-stilt";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 100_000;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        Random r = new Random(seed);
+                        placer.dg = dg;
+                        double bh = 0;
+                        for (int i = 0; i < n; i++) {
+                            int x = r.nextInt(1 << 20), z = r.nextInt(1 << 20);
+                            int ret = tree.place(x, 64, z, placer, stiltPlacement,
+                                    new RNG(seed + i), (com.volmit.iris.util.math.BlockPosition p, BlockData d) -> {
+                                    }, null, null);
+                            dg.add(ret);
+                            bh += ret;
+                        }
+                        return bh;
+                    }
+                });
             }
 
             // HyperLock: hit-pattern lock/unlock through with(x, z, runnable)
