@@ -8,6 +8,7 @@
 | [round3-concurrency.md](round3-concurrency.md) | 并发/共享缓存：Caffeine、并行扩展 2.3×→3.6× |
 | [round4-datastructures.md](round4-datastructures.md) | 数据结构/装箱：条带原始键缓存重写，命中 2.8×、8 线程 raster 62.8×、分配再 -53% |
 | [round5-terrain-actuator.md](round5-terrain-actuator.md) | 地形执行器：列循环不变量提升 + 矿石预检，1.55×/列 |
+| [round6-dispatch.md](round6-dispatch.md) | 派发扁平化：<1%（结论——离线可测面已收敛到本质开销） |
 
 - 原始数据：`benchmark/results/round*.csv`（每场景 5 次测量）
 - 金样本：`benchmark/golden/golden.csv`（23 场景固定种子摘要，行为一致性的判定基准）
