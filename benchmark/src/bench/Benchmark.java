@@ -990,6 +990,120 @@ public final class Benchmark {
                 });
             }
 
+            // ---- Deposit placement write path (IrisDepositModifier.generate) ----
+            // Real modifier against the Engine proxy (getHeight -> 256), real
+            // MantleChunk, pre-filled height grid and a 16x256x16 hunk whose
+            // sub-64 layers are DEEPSLATE so the deepslate ore-conversion table
+            // is exercised on ~half of all placed blocks. The hunk is reset
+            // between iterations (through the base, non-listening hunk) so
+            // fresh conversions keep firing; every generate() write folds into
+            // the digest via Hunk.listen.
+            {
+                final com.volmit.iris.engine.framework.Engine depositEngine;
+                {
+                    java.util.Map<String, Object> hard = new java.util.HashMap<>();
+                    hard.put("getCacheID", 654321);
+                    hard.put("getSeedManager",
+                            new com.volmit.iris.engine.framework.SeedManager(7654321L));
+                    hard.put("getData", com.volmit.iris.core.loader.IrisData.get(
+                            new java.io.File("benchmark/results/_decodata")));
+                    hard.put("getHeight", 256);
+                    hard.put("getMinHeight", 0);
+                    java.lang.reflect.InvocationHandler h = (proxy, method, args) -> {
+                        Object v = hard.get(method.getName());
+                        if (v != null) {
+                            return v;
+                        }
+                        Class<?> rt = method.getReturnType();
+                        if (rt == boolean.class) return false;
+                        if (rt == long.class) return 0L;
+                        if (rt == int.class) return 0;
+                        if (rt == double.class) return 0D;
+                        if (rt == float.class) return 0F;
+                        if (rt == short.class) return (short) 0;
+                        if (rt == byte.class) return (byte) 0;
+                        if (rt == char.class) return (char) 0;
+                        return null;
+                    };
+                    depositEngine = (com.volmit.iris.engine.framework.Engine)
+                            java.lang.reflect.Proxy.newProxyInstance(
+                                    Benchmark.class.getClassLoader(),
+                                    new Class[]{com.volmit.iris.engine.framework.Engine.class}, h);
+                }
+
+                final com.volmit.iris.engine.modifier.IrisDepositModifier modifier =
+                        new com.volmit.iris.engine.modifier.IrisDepositModifier(depositEngine);
+                final com.volmit.iris.engine.object.IrisDepositGenerator gen =
+                        new com.volmit.iris.engine.object.IrisDepositGenerator()
+                                .setMinHeight(1).setMaxHeight(80)
+                                .setMinSize(8).setMaxSize(40)
+                                .setMinPerChunk(2).setMaxPerChunk(4)
+                                .setSpawnChance(1.0).setPerClumpSpawnChance(1.0)
+                                .setPalette(new KList<com.volmit.iris.engine.object.IrisBlockData>()
+                                        .qadd(new com.volmit.iris.engine.object.IrisBlockData("diamond_ore"))
+                                        .qadd(new com.volmit.iris.engine.object.IrisBlockData("redstone_ore"))
+                                        .qadd(new com.volmit.iris.engine.object.IrisBlockData("lapis_ore")));
+
+                final Double[] heightGrid = new Double[256];
+                for (int i = 0; i < 256; i++) {
+                    heightGrid[i] = (double) (100 + ((i * 7 + i / 16) % 11));
+                }
+                final com.volmit.iris.util.context.ChunkContext ctx =
+                        new com.volmit.iris.util.context.ChunkContext(0, 0, null)
+                                .height(new com.volmit.iris.util.context.ChunkedDataCache<Double>(null, 0, 0)
+                                        .prefill(heightGrid));
+
+                final MantleChunk depChunk = new MantleChunk(16, 0, 0);
+                final BlockData deepslate = Material.DEEPSLATE.createBlockData();
+                final BlockData stone = Material.STONE.createBlockData();
+                final Hunk<BlockData> hunkBase = Hunk.newArrayHunk(16, 256, 16);
+                final Digest[] writeDigest = new Digest[1];
+                final Hunk<BlockData> hunk = hunkBase.listen((x, y, z, t) -> {
+                    Digest d = writeDigest[0];
+                    d.add(x);
+                    d.add(y);
+                    d.add(z);
+                    d.add(t == null ? -1 : t.getMaterial().ordinal());
+                });
+
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "deposit-place";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 2_000;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        writeDigest[0] = dg;
+                        Random r = new Random(seed);
+                        // Reset: sub-64 layers deepslate, above stone, so each
+                        // iteration converts fresh blocks.
+                        for (int x = 0; x < 16; x++) {
+                            for (int y = 0; y < 256; y++) {
+                                BlockData fill = y < 64 ? deepslate : stone;
+                                for (int z = 0; z < 16; z++) {
+                                    hunkBase.set(x, y, z, fill);
+                                }
+                            }
+                        }
+                        double bh = 0;
+                        for (int i = 0; i < n; i++) {
+                            RNG rng = new RNG(seed + i);
+                            modifier.generate(gen, depChunk, hunk, rng,
+                                    r.nextInt(1 << 12), r.nextInt(1 << 12), false, null, ctx);
+                            bh += i;
+                        }
+                        writeDigest[0] = null;
+                        return bh;
+                    }
+                });
+            }
+
             // HyperLock: hit-pattern lock/unlock through with(x, z, runnable)
             // (region keys repeat, like Mantle region locking in production).
             HyperLock hl = new HyperLock(1024);

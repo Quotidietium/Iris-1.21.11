@@ -11,6 +11,7 @@ import org.bukkit.block.data.BlockData;
 public class ChunkContext {
     private final int x;
     private final int z;
+    private ChunkedDataCache<Double> height;
 
     public ChunkContext(int x, int z, Object complex) {
         this(x, z, complex, true);
@@ -19,6 +20,12 @@ public class ChunkContext {
     public ChunkContext(int x, int z, Object complex, boolean cache) {
         this.x = x;
         this.z = z;
+    }
+
+    /** Bench hook: attach a pre-filled height cache so getHeight().get answers offline. */
+    public ChunkContext height(ChunkedDataCache<Double> height) {
+        this.height = height;
+        return this;
     }
 
     public int getX() {
@@ -30,6 +37,9 @@ public class ChunkContext {
     }
 
     public ChunkedDataCache<Double> getHeight() {
+        if (height != null) {
+            return height;
+        }
         throw new UnsupportedOperationException("stub");
     }
 
