@@ -1520,6 +1520,114 @@ public final class Benchmark {
                 });
             }
 
+            // ---- Biome height sampling (IrisBiome.getHeight -> generator links) ----
+            // Two real generator links whose keys miss the offline loader (the
+            // default-IrisGenerator fallback is the production null-fallback
+            // path). Per op: one full biome height sample = 2 link getHeight
+            // calls, each resolving its cached generator (the hottest stream
+            // accessor in the engine).
+            {
+                final com.volmit.iris.engine.framework.Engine heightEngine;
+                {
+                    java.util.Map<String, Object> hard = new java.util.HashMap<>();
+                    hard.put("getHeight", 384);
+                    hard.put("getData", com.volmit.iris.core.loader.IrisData.get(
+                            new java.io.File("benchmark/results/_decodata")));
+                    java.lang.reflect.InvocationHandler h = (proxy, method, args) -> {
+                        Object v = hard.get(method.getName());
+                        if (v != null) {
+                            return v;
+                        }
+                        Class<?> rt = method.getReturnType();
+                        if (rt == boolean.class) return false;
+                        if (rt == long.class) return 0L;
+                        if (rt == int.class) return 0;
+                        if (rt == double.class) return 0D;
+                        if (rt == float.class) return 0F;
+                        if (rt == short.class) return (short) 0;
+                        if (rt == byte.class) return (byte) 0;
+                        if (rt == char.class) return (char) 0;
+                        return null;
+                    };
+                    heightEngine = (com.volmit.iris.engine.framework.Engine)
+                            java.lang.reflect.Proxy.newProxyInstance(
+                                    Benchmark.class.getClassLoader(),
+                                    new Class[]{com.volmit.iris.engine.framework.Engine.class}, h);
+                }
+
+                final com.volmit.iris.engine.object.IrisBiome hBiome =
+                        new com.volmit.iris.engine.object.IrisBiome();
+                hBiome.setGenerators(new KList<>(
+                        new com.volmit.iris.engine.object.IrisBiomeGeneratorLink()
+                                .setGenerator("bench-gen-a").setMin(-4).setMax(28),
+                        new com.volmit.iris.engine.object.IrisBiomeGeneratorLink()
+                                .setGenerator("bench-gen-b").setMin(2).setMax(40)));
+
+                out.add(sc("biome-height", (n, seed, dg) -> {
+                    Random r = new Random(seed);
+                    double bh = 0;
+                    for (int i = 0; i < n; i++) {
+                        double x = r.nextInt(200_000) - 100_000;
+                        double z = r.nextInt(200_000) - 100_000;
+                        double v = hBiome.getHeight(heightEngine, x, z, seed);
+                        dg.add(v);
+                        bh += v;
+                    }
+                    return bh;
+                }));
+            }
+
+            // ---- Layer fill (IrisBiome.generateLayers) ----
+            // Three palette layers (2-3 weighted blocks each, thickness 2-8,
+            // STATIC layer height like typical surface configs). Per op: one
+            // full column layer generation with a per-column RNG, exactly as
+            // TerrainColumn invokes it. Digest = per-block material ordinals.
+            {
+                final com.volmit.iris.core.loader.IrisData lData = com.volmit.iris.core.loader.IrisData.get(
+                        new java.io.File("benchmark/results/_decodata"));
+                final com.volmit.iris.engine.object.IrisDimension lDim =
+                        new com.volmit.iris.engine.object.IrisDimension();
+
+                final com.volmit.iris.engine.object.IrisBiome lBiome =
+                        new com.volmit.iris.engine.object.IrisBiome();
+                {
+                    KList<com.volmit.iris.engine.object.IrisBiomePaletteLayer> ls = new KList<>();
+                    ls.add(new com.volmit.iris.engine.object.IrisBiomePaletteLayer()
+                            .setMinHeight(2).setMaxHeight(4)
+                            .setPalette(new KList<>(
+                                    new com.volmit.iris.engine.object.IrisBlockData("grass_block"),
+                                    new com.volmit.iris.engine.object.IrisBlockData("dirt"))));
+                    ls.add(new com.volmit.iris.engine.object.IrisBiomePaletteLayer()
+                            .setMinHeight(2).setMaxHeight(8)
+                            .setPalette(new KList<>(
+                                    new com.volmit.iris.engine.object.IrisBlockData("dirt"),
+                                    new com.volmit.iris.engine.object.IrisBlockData("coarse_dirt"),
+                                    new com.volmit.iris.engine.object.IrisBlockData("dirt"))));
+                    ls.add(new com.volmit.iris.engine.object.IrisBiomePaletteLayer()
+                            .setMinHeight(2).setMaxHeight(6)
+                            .setPalette(new KList<>(
+                                    new com.volmit.iris.engine.object.IrisBlockData("stone"),
+                                    new com.volmit.iris.engine.object.IrisBlockData("stone"))));
+                    lBiome.setLayers(ls);
+                }
+
+                out.add(sc("layers-gen", (n, seed, dg) -> {
+                    Random r = new Random(seed);
+                    double bh = 0;
+                    for (int i = 0; i < n; i++) {
+                        int x = r.nextInt(200_000) - 100_000;
+                        int z = r.nextInt(200_000) - 100_000;
+                        RNG rng = new RNG(((long) x << 32) ^ z);
+                        KList<BlockData> blocks = lBiome.generateLayers(lDim, x, z, rng, 16, 100, lData, null);
+                        for (BlockData b : blocks) {
+                            dg.add(b.getMaterial().ordinal());
+                            bh += b.getMaterial().ordinal();
+                        }
+                    }
+                    return bh;
+                }));
+            }
+
             // HyperLock: hit-pattern lock/unlock through with(x, z, runnable)
             // (region keys repeat, like Mantle region locking in production).
             HyperLock hl = new HyperLock(1024);
