@@ -47,8 +47,6 @@ public class IrisPerfectionModifier extends EngineAssignedModifier<BlockData> {
         AtomicBoolean changed = new AtomicBoolean(true);
         int passes = 0;
         AtomicInteger changes = new AtomicInteger();
-        List<Integer> surfaces = new ArrayList<>();
-        List<Integer> ceilings = new ArrayList<>();
         BurstExecutor burst = burst().burst(multicore);
         while (changed.get()) {
             passes++;
@@ -56,9 +54,11 @@ public class IrisPerfectionModifier extends EngineAssignedModifier<BlockData> {
             for (int i = 0; i < 16; i++) {
                 int finalI = i;
                 burst.queue(() -> {
+                    // Per-task local: the previous shared list raced across the
+                    // concurrently submitted column tasks (multicore mode).
+                    List<Integer> surfaces = new ArrayList<>();
                     for (int j = 0; j < 16; j++) {
                         surfaces.clear();
-                        ceilings.clear();
                         int top = getHeight(output, finalI, j);
                         boolean inside = true;
                         surfaces.add(top);
@@ -72,8 +72,6 @@ public class IrisPerfectionModifier extends EngineAssignedModifier<BlockData> {
 
                                 if (inside) {
                                     surfaces.add(k);
-                                } else {
-                                    ceilings.add(k + 1);
                                 }
                             }
                         }
@@ -118,6 +116,10 @@ public class IrisPerfectionModifier extends EngineAssignedModifier<BlockData> {
                     }
                 });
             }
+            // Each multicore wave must finish before the next pass re-reads the
+            // hunk; without this the queued tasks kept mutating the chunk while
+            // the following engine stages (insertMatter, custom) already ran.
+            burst.complete();
         }
 
         getEngine().getMetrics().getPerfection().put(p.getMilliseconds());
