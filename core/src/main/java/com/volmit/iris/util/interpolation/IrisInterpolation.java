@@ -1098,61 +1098,37 @@ public class IrisInterpolation {
         InterpolationMemo n = InterpolationMemo.acquire(noise, x, z);
         double r;
         try {
-        if (method.equals(InterpolationMethod.BILINEAR)) {
-            r = getBilinearNoise(x, z, h, n);
-        } else if (method.equals(InterpolationMethod.STARCAST_3)) {
-            r = Starcast.starcast(x, z, h, 3D, n);
-        } else if (method.equals(InterpolationMethod.STARCAST_6)) {
-            r = Starcast.starcast(x, z, h, 6D, n);
-        } else if (method.equals(InterpolationMethod.STARCAST_9)) {
-            r = Starcast.starcast(x, z, h, 9D, n);
-        } else if (method.equals(InterpolationMethod.STARCAST_12)) {
-            r = Starcast.starcast(x, z, h, 12D, n);
-        } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_3)) {
-            r = Starcast.starcast(x, z, h, 3D, n.bilinearAdapter.configure(h));
-        } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_6)) {
-            r = Starcast.starcast(x, z, h, 6D, n.bilinearAdapter.configure(h));
-        } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_9)) {
-            r = Starcast.starcast(x, z, h, 9D, n.bilinearAdapter.configure(h));
-        } else if (method.equals(InterpolationMethod.BILINEAR_STARCAST_12)) {
-            r = Starcast.starcast(x, z, h, 12D, n.bilinearAdapter.configure(h));
-        } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_3)) {
-            r = Starcast.starcast(x, z, h, 3D, n.hermiteAdapter.configure(h));
-        } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_6)) {
-            r = Starcast.starcast(x, z, h, 6D, n.hermiteAdapter.configure(h));
-        } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_9)) {
-            r = Starcast.starcast(x, z, h, 9D, n.hermiteAdapter.configure(h));
-        } else if (method.equals(InterpolationMethod.HERMITE_STARCAST_12)) {
-            r = Starcast.starcast(x, z, h, 12D, n.hermiteAdapter.configure(h));
-        } else if (method.equals(InterpolationMethod.BILINEAR_BEZIER)) {
-            r = getBilinearBezierNoise(x, z, h, n);
-        } else if (method.equals(InterpolationMethod.BILINEAR_PARAMETRIC_2)) {
-            r = getBilinearParametricNoise(x, z, h, n, 2);
-        } else if (method.equals(InterpolationMethod.BILINEAR_PARAMETRIC_4)) {
-            r = getBilinearParametricNoise(x, z, h, n, 4);
-        } else if (method.equals(InterpolationMethod.BILINEAR_PARAMETRIC_1_5)) {
-            r = getBilinearParametricNoise(x, z, h, n, 1.5);
-        } else if (method.equals(InterpolationMethod.BICUBIC)) {
-            r = getBilinearNoise(x, z, h, n);
-        } else if (method.equals(InterpolationMethod.HERMITE)) {
-            r = getHermiteNoise(x, z, h, n);
-        } else if (method.equals(InterpolationMethod.HERMITE_TENSE)) {
-            r = getHermiteNoise(x, z, h, n, 0.8D, 0D);
-        } else if (method.equals(InterpolationMethod.CATMULL_ROM_SPLINE)) {
-            r = getHermiteNoise(x, z, h, n, 1D, 0D);
-        } else if (method.equals(InterpolationMethod.HERMITE_LOOSE)) {
-            r = getHermiteNoise(x, z, h, n, 0D, 0D);
-        } else if (method.equals(InterpolationMethod.HERMITE_LOOSE_HALF_NEGATIVE_BIAS)) {
-            r = getHermiteNoise(x, z, h, n, 0D, -0.5D);
-        } else if (method.equals(InterpolationMethod.HERMITE_LOOSE_HALF_POSITIVE_BIAS)) {
-            r = getHermiteNoise(x, z, h, n, 0D, 0.5D);
-        } else if (method.equals(InterpolationMethod.HERMITE_LOOSE_FULL_NEGATIVE_BIAS)) {
-            r = getHermiteNoise(x, z, h, n, 0D, -1D);
-        } else if (method.equals(InterpolationMethod.HERMITE_LOOSE_FULL_POSITIVE_BIAS)) {
-            r = getHermiteNoise(x, z, h, n, 0D, 1D);
-        } else {
-            r = n.noise(x, z);
-        }
+            // Enum switch (tableswitch) replaces the previous 20+-branch
+            // equals() chain; branch order/mapping preserved exactly.
+            switch (method) {
+                case BILINEAR -> r = getBilinearNoise(x, z, h, n);
+                case STARCAST_3 -> r = Starcast.starcast(x, z, h, 3D, n);
+                case STARCAST_6 -> r = Starcast.starcast(x, z, h, 6D, n);
+                case STARCAST_9 -> r = Starcast.starcast(x, z, h, 9D, n);
+                case STARCAST_12 -> r = Starcast.starcast(x, z, h, 12D, n);
+                case BILINEAR_STARCAST_3 -> r = Starcast.starcast(x, z, h, 3D, n.bilinearAdapter.configure(h));
+                case BILINEAR_STARCAST_6 -> r = Starcast.starcast(x, z, h, 6D, n.bilinearAdapter.configure(h));
+                case BILINEAR_STARCAST_9 -> r = Starcast.starcast(x, z, h, 9D, n.bilinearAdapter.configure(h));
+                case BILINEAR_STARCAST_12 -> r = Starcast.starcast(x, z, h, 12D, n.bilinearAdapter.configure(h));
+                case HERMITE_STARCAST_3 -> r = Starcast.starcast(x, z, h, 3D, n.hermiteAdapter.configure(h));
+                case HERMITE_STARCAST_6 -> r = Starcast.starcast(x, z, h, 6D, n.hermiteAdapter.configure(h));
+                case HERMITE_STARCAST_9 -> r = Starcast.starcast(x, z, h, 9D, n.hermiteAdapter.configure(h));
+                case HERMITE_STARCAST_12 -> r = Starcast.starcast(x, z, h, 12D, n.hermiteAdapter.configure(h));
+                case BILINEAR_BEZIER -> r = getBilinearBezierNoise(x, z, h, n);
+                case BILINEAR_PARAMETRIC_2 -> r = getBilinearParametricNoise(x, z, h, n, 2);
+                case BILINEAR_PARAMETRIC_4 -> r = getBilinearParametricNoise(x, z, h, n, 4);
+                case BILINEAR_PARAMETRIC_1_5 -> r = getBilinearParametricNoise(x, z, h, n, 1.5);
+                case BICUBIC -> r = getBilinearNoise(x, z, h, n); // upstream maps BICUBIC to bilinear; preserved
+                case HERMITE -> r = getHermiteNoise(x, z, h, n);
+                case HERMITE_TENSE -> r = getHermiteNoise(x, z, h, n, 0.8D, 0D);
+                case CATMULL_ROM_SPLINE -> r = getHermiteNoise(x, z, h, n, 1D, 0D);
+                case HERMITE_LOOSE -> r = getHermiteNoise(x, z, h, n, 0D, 0D);
+                case HERMITE_LOOSE_HALF_NEGATIVE_BIAS -> r = getHermiteNoise(x, z, h, n, 0D, -0.5D);
+                case HERMITE_LOOSE_HALF_POSITIVE_BIAS -> r = getHermiteNoise(x, z, h, n, 0D, 0.5D);
+                case HERMITE_LOOSE_FULL_NEGATIVE_BIAS -> r = getHermiteNoise(x, z, h, n, 0D, -1D);
+                case HERMITE_LOOSE_FULL_POSITIVE_BIAS -> r = getHermiteNoise(x, z, h, n, 0D, 1D);
+                default -> r = n.noise(x, z);
+            }
         } finally {
             n.release();
         }

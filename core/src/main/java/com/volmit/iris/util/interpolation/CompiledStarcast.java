@@ -49,389 +49,141 @@ public class CompiledStarcast {
             , -0.99026805F, -0.35836795F, -0.54463905F, -0.9335804F};
 
     public static float getStarcast(float x, float z, float r, float checks, NoiseProvider n) {
+        // Tableswitch over floor(checks); the previous 128-branch if-chain
+        // dispatched to sc(k) for checks in [k, k+1), which for positive
+        // floats is exactly (int) checks. Guard and fallback loop unchanged.
         if (checks >= 1 && checks <= 128) {
-            if (checks < 2) {
-                return sc1(x, z, r, n);
-            }
-            if (checks < 3) {
-                return sc2(x, z, r, n);
-            }
-            if (checks < 4) {
-                return sc3(x, z, r, n);
-            }
-            if (checks < 5) {
-                return sc4(x, z, r, n);
-            }
-            if (checks < 6) {
-                return sc5(x, z, r, n);
-            }
-            if (checks < 7) {
-                return sc6(x, z, r, n);
-            }
-            if (checks < 8) {
-                return sc7(x, z, r, n);
-            }
-            if (checks < 9) {
-                return sc8(x, z, r, n);
-            }
-            if (checks < 10) {
-                return sc9(x, z, r, n);
-            }
-            if (checks < 11) {
-                return sc10(x, z, r, n);
-            }
-            if (checks < 12) {
-                return sc11(x, z, r, n);
-            }
-            if (checks < 13) {
-                return sc12(x, z, r, n);
-            }
-            if (checks < 14) {
-                return sc13(x, z, r, n);
-            }
-            if (checks < 15) {
-                return sc14(x, z, r, n);
-            }
-            if (checks < 16) {
-                return sc15(x, z, r, n);
-            }
-            if (checks < 17) {
-                return sc16(x, z, r, n);
-            }
-            if (checks < 18) {
-                return sc17(x, z, r, n);
-            }
-            if (checks < 19) {
-                return sc18(x, z, r, n);
-            }
-            if (checks < 20) {
-                return sc19(x, z, r, n);
-            }
-            if (checks < 21) {
-                return sc20(x, z, r, n);
-            }
-            if (checks < 22) {
-                return sc21(x, z, r, n);
-            }
-            if (checks < 23) {
-                return sc22(x, z, r, n);
-            }
-            if (checks < 24) {
-                return sc23(x, z, r, n);
-            }
-            if (checks < 25) {
-                return sc24(x, z, r, n);
-            }
-            if (checks < 26) {
-                return sc25(x, z, r, n);
-            }
-            if (checks < 27) {
-                return sc26(x, z, r, n);
-            }
-            if (checks < 28) {
-                return sc27(x, z, r, n);
-            }
-            if (checks < 29) {
-                return sc28(x, z, r, n);
-            }
-            if (checks < 30) {
-                return sc29(x, z, r, n);
-            }
-            if (checks < 31) {
-                return sc30(x, z, r, n);
-            }
-            if (checks < 32) {
-                return sc31(x, z, r, n);
-            }
-            if (checks < 33) {
-                return sc32(x, z, r, n);
-            }
-            if (checks < 34) {
-                return sc33(x, z, r, n);
-            }
-            if (checks < 35) {
-                return sc34(x, z, r, n);
-            }
-            if (checks < 36) {
-                return sc35(x, z, r, n);
-            }
-            if (checks < 37) {
-                return sc36(x, z, r, n);
-            }
-            if (checks < 38) {
-                return sc37(x, z, r, n);
-            }
-            if (checks < 39) {
-                return sc38(x, z, r, n);
-            }
-            if (checks < 40) {
-                return sc39(x, z, r, n);
-            }
-            if (checks < 41) {
-                return sc40(x, z, r, n);
-            }
-            if (checks < 42) {
-                return sc41(x, z, r, n);
-            }
-            if (checks < 43) {
-                return sc42(x, z, r, n);
-            }
-            if (checks < 44) {
-                return sc43(x, z, r, n);
-            }
-            if (checks < 45) {
-                return sc44(x, z, r, n);
-            }
-            if (checks < 46) {
-                return sc45(x, z, r, n);
-            }
-            if (checks < 47) {
-                return sc46(x, z, r, n);
-            }
-            if (checks < 48) {
-                return sc47(x, z, r, n);
-            }
-            if (checks < 49) {
-                return sc48(x, z, r, n);
-            }
-            if (checks < 50) {
-                return sc49(x, z, r, n);
-            }
-            if (checks < 51) {
-                return sc50(x, z, r, n);
-            }
-            if (checks < 52) {
-                return sc51(x, z, r, n);
-            }
-            if (checks < 53) {
-                return sc52(x, z, r, n);
-            }
-            if (checks < 54) {
-                return sc53(x, z, r, n);
-            }
-            if (checks < 55) {
-                return sc54(x, z, r, n);
-            }
-            if (checks < 56) {
-                return sc55(x, z, r, n);
-            }
-            if (checks < 57) {
-                return sc56(x, z, r, n);
-            }
-            if (checks < 58) {
-                return sc57(x, z, r, n);
-            }
-            if (checks < 59) {
-                return sc58(x, z, r, n);
-            }
-            if (checks < 60) {
-                return sc59(x, z, r, n);
-            }
-            if (checks < 61) {
-                return sc60(x, z, r, n);
-            }
-            if (checks < 62) {
-                return sc61(x, z, r, n);
-            }
-            if (checks < 63) {
-                return sc62(x, z, r, n);
-            }
-            if (checks < 64) {
-                return sc63(x, z, r, n);
-            }
-            if (checks < 65) {
-                return sc64(x, z, r, n);
-            }
-            if (checks < 66) {
-                return sc65(x, z, r, n);
-            }
-            if (checks < 67) {
-                return sc66(x, z, r, n);
-            }
-            if (checks < 68) {
-                return sc67(x, z, r, n);
-            }
-            if (checks < 69) {
-                return sc68(x, z, r, n);
-            }
-            if (checks < 70) {
-                return sc69(x, z, r, n);
-            }
-            if (checks < 71) {
-                return sc70(x, z, r, n);
-            }
-            if (checks < 72) {
-                return sc71(x, z, r, n);
-            }
-            if (checks < 73) {
-                return sc72(x, z, r, n);
-            }
-            if (checks < 74) {
-                return sc73(x, z, r, n);
-            }
-            if (checks < 75) {
-                return sc74(x, z, r, n);
-            }
-            if (checks < 76) {
-                return sc75(x, z, r, n);
-            }
-            if (checks < 77) {
-                return sc76(x, z, r, n);
-            }
-            if (checks < 78) {
-                return sc77(x, z, r, n);
-            }
-            if (checks < 79) {
-                return sc78(x, z, r, n);
-            }
-            if (checks < 80) {
-                return sc79(x, z, r, n);
-            }
-            if (checks < 81) {
-                return sc80(x, z, r, n);
-            }
-            if (checks < 82) {
-                return sc81(x, z, r, n);
-            }
-            if (checks < 83) {
-                return sc82(x, z, r, n);
-            }
-            if (checks < 84) {
-                return sc83(x, z, r, n);
-            }
-            if (checks < 85) {
-                return sc84(x, z, r, n);
-            }
-            if (checks < 86) {
-                return sc85(x, z, r, n);
-            }
-            if (checks < 87) {
-                return sc86(x, z, r, n);
-            }
-            if (checks < 88) {
-                return sc87(x, z, r, n);
-            }
-            if (checks < 89) {
-                return sc88(x, z, r, n);
-            }
-            if (checks < 90) {
-                return sc89(x, z, r, n);
-            }
-            if (checks < 91) {
-                return sc90(x, z, r, n);
-            }
-            if (checks < 92) {
-                return sc91(x, z, r, n);
-            }
-            if (checks < 93) {
-                return sc92(x, z, r, n);
-            }
-            if (checks < 94) {
-                return sc93(x, z, r, n);
-            }
-            if (checks < 95) {
-                return sc94(x, z, r, n);
-            }
-            if (checks < 96) {
-                return sc95(x, z, r, n);
-            }
-            if (checks < 97) {
-                return sc96(x, z, r, n);
-            }
-            if (checks < 98) {
-                return sc97(x, z, r, n);
-            }
-            if (checks < 99) {
-                return sc98(x, z, r, n);
-            }
-            if (checks < 100) {
-                return sc99(x, z, r, n);
-            }
-            if (checks < 101) {
-                return sc100(x, z, r, n);
-            }
-            if (checks < 102) {
-                return sc101(x, z, r, n);
-            }
-            if (checks < 103) {
-                return sc102(x, z, r, n);
-            }
-            if (checks < 104) {
-                return sc103(x, z, r, n);
-            }
-            if (checks < 105) {
-                return sc104(x, z, r, n);
-            }
-            if (checks < 106) {
-                return sc105(x, z, r, n);
-            }
-            if (checks < 107) {
-                return sc106(x, z, r, n);
-            }
-            if (checks < 108) {
-                return sc107(x, z, r, n);
-            }
-            if (checks < 109) {
-                return sc108(x, z, r, n);
-            }
-            if (checks < 110) {
-                return sc109(x, z, r, n);
-            }
-            if (checks < 111) {
-                return sc110(x, z, r, n);
-            }
-            if (checks < 112) {
-                return sc111(x, z, r, n);
-            }
-            if (checks < 113) {
-                return sc112(x, z, r, n);
-            }
-            if (checks < 114) {
-                return sc113(x, z, r, n);
-            }
-            if (checks < 115) {
-                return sc114(x, z, r, n);
-            }
-            if (checks < 116) {
-                return sc115(x, z, r, n);
-            }
-            if (checks < 117) {
-                return sc116(x, z, r, n);
-            }
-            if (checks < 118) {
-                return sc117(x, z, r, n);
-            }
-            if (checks < 119) {
-                return sc118(x, z, r, n);
-            }
-            if (checks < 120) {
-                return sc119(x, z, r, n);
-            }
-            if (checks < 121) {
-                return sc120(x, z, r, n);
-            }
-            if (checks < 122) {
-                return sc121(x, z, r, n);
-            }
-            if (checks < 123) {
-                return sc122(x, z, r, n);
-            }
-            if (checks < 124) {
-                return sc123(x, z, r, n);
-            }
-            if (checks < 125) {
-                return sc124(x, z, r, n);
-            }
-            if (checks < 126) {
-                return sc125(x, z, r, n);
-            }
-            if (checks < 127) {
-                return sc126(x, z, r, n);
-            }
-            if (checks < 128) {
-                return sc127(x, z, r, n);
-            }
-            return sc128(x, z, r, n);
+            return switch ((int) checks) {
+                case 1 -> sc1(x, z, r, n);
+                case 2 -> sc2(x, z, r, n);
+                case 3 -> sc3(x, z, r, n);
+                case 4 -> sc4(x, z, r, n);
+                case 5 -> sc5(x, z, r, n);
+                case 6 -> sc6(x, z, r, n);
+                case 7 -> sc7(x, z, r, n);
+                case 8 -> sc8(x, z, r, n);
+                case 9 -> sc9(x, z, r, n);
+                case 10 -> sc10(x, z, r, n);
+                case 11 -> sc11(x, z, r, n);
+                case 12 -> sc12(x, z, r, n);
+                case 13 -> sc13(x, z, r, n);
+                case 14 -> sc14(x, z, r, n);
+                case 15 -> sc15(x, z, r, n);
+                case 16 -> sc16(x, z, r, n);
+                case 17 -> sc17(x, z, r, n);
+                case 18 -> sc18(x, z, r, n);
+                case 19 -> sc19(x, z, r, n);
+                case 20 -> sc20(x, z, r, n);
+                case 21 -> sc21(x, z, r, n);
+                case 22 -> sc22(x, z, r, n);
+                case 23 -> sc23(x, z, r, n);
+                case 24 -> sc24(x, z, r, n);
+                case 25 -> sc25(x, z, r, n);
+                case 26 -> sc26(x, z, r, n);
+                case 27 -> sc27(x, z, r, n);
+                case 28 -> sc28(x, z, r, n);
+                case 29 -> sc29(x, z, r, n);
+                case 30 -> sc30(x, z, r, n);
+                case 31 -> sc31(x, z, r, n);
+                case 32 -> sc32(x, z, r, n);
+                case 33 -> sc33(x, z, r, n);
+                case 34 -> sc34(x, z, r, n);
+                case 35 -> sc35(x, z, r, n);
+                case 36 -> sc36(x, z, r, n);
+                case 37 -> sc37(x, z, r, n);
+                case 38 -> sc38(x, z, r, n);
+                case 39 -> sc39(x, z, r, n);
+                case 40 -> sc40(x, z, r, n);
+                case 41 -> sc41(x, z, r, n);
+                case 42 -> sc42(x, z, r, n);
+                case 43 -> sc43(x, z, r, n);
+                case 44 -> sc44(x, z, r, n);
+                case 45 -> sc45(x, z, r, n);
+                case 46 -> sc46(x, z, r, n);
+                case 47 -> sc47(x, z, r, n);
+                case 48 -> sc48(x, z, r, n);
+                case 49 -> sc49(x, z, r, n);
+                case 50 -> sc50(x, z, r, n);
+                case 51 -> sc51(x, z, r, n);
+                case 52 -> sc52(x, z, r, n);
+                case 53 -> sc53(x, z, r, n);
+                case 54 -> sc54(x, z, r, n);
+                case 55 -> sc55(x, z, r, n);
+                case 56 -> sc56(x, z, r, n);
+                case 57 -> sc57(x, z, r, n);
+                case 58 -> sc58(x, z, r, n);
+                case 59 -> sc59(x, z, r, n);
+                case 60 -> sc60(x, z, r, n);
+                case 61 -> sc61(x, z, r, n);
+                case 62 -> sc62(x, z, r, n);
+                case 63 -> sc63(x, z, r, n);
+                case 64 -> sc64(x, z, r, n);
+                case 65 -> sc65(x, z, r, n);
+                case 66 -> sc66(x, z, r, n);
+                case 67 -> sc67(x, z, r, n);
+                case 68 -> sc68(x, z, r, n);
+                case 69 -> sc69(x, z, r, n);
+                case 70 -> sc70(x, z, r, n);
+                case 71 -> sc71(x, z, r, n);
+                case 72 -> sc72(x, z, r, n);
+                case 73 -> sc73(x, z, r, n);
+                case 74 -> sc74(x, z, r, n);
+                case 75 -> sc75(x, z, r, n);
+                case 76 -> sc76(x, z, r, n);
+                case 77 -> sc77(x, z, r, n);
+                case 78 -> sc78(x, z, r, n);
+                case 79 -> sc79(x, z, r, n);
+                case 80 -> sc80(x, z, r, n);
+                case 81 -> sc81(x, z, r, n);
+                case 82 -> sc82(x, z, r, n);
+                case 83 -> sc83(x, z, r, n);
+                case 84 -> sc84(x, z, r, n);
+                case 85 -> sc85(x, z, r, n);
+                case 86 -> sc86(x, z, r, n);
+                case 87 -> sc87(x, z, r, n);
+                case 88 -> sc88(x, z, r, n);
+                case 89 -> sc89(x, z, r, n);
+                case 90 -> sc90(x, z, r, n);
+                case 91 -> sc91(x, z, r, n);
+                case 92 -> sc92(x, z, r, n);
+                case 93 -> sc93(x, z, r, n);
+                case 94 -> sc94(x, z, r, n);
+                case 95 -> sc95(x, z, r, n);
+                case 96 -> sc96(x, z, r, n);
+                case 97 -> sc97(x, z, r, n);
+                case 98 -> sc98(x, z, r, n);
+                case 99 -> sc99(x, z, r, n);
+                case 100 -> sc100(x, z, r, n);
+                case 101 -> sc101(x, z, r, n);
+                case 102 -> sc102(x, z, r, n);
+                case 103 -> sc103(x, z, r, n);
+                case 104 -> sc104(x, z, r, n);
+                case 105 -> sc105(x, z, r, n);
+                case 106 -> sc106(x, z, r, n);
+                case 107 -> sc107(x, z, r, n);
+                case 108 -> sc108(x, z, r, n);
+                case 109 -> sc109(x, z, r, n);
+                case 110 -> sc110(x, z, r, n);
+                case 111 -> sc111(x, z, r, n);
+                case 112 -> sc112(x, z, r, n);
+                case 113 -> sc113(x, z, r, n);
+                case 114 -> sc114(x, z, r, n);
+                case 115 -> sc115(x, z, r, n);
+                case 116 -> sc116(x, z, r, n);
+                case 117 -> sc117(x, z, r, n);
+                case 118 -> sc118(x, z, r, n);
+                case 119 -> sc119(x, z, r, n);
+                case 120 -> sc120(x, z, r, n);
+                case 121 -> sc121(x, z, r, n);
+                case 122 -> sc122(x, z, r, n);
+                case 123 -> sc123(x, z, r, n);
+                case 124 -> sc124(x, z, r, n);
+                case 125 -> sc125(x, z, r, n);
+                case 126 -> sc126(x, z, r, n);
+                case 127 -> sc127(x, z, r, n);
+                case 128 -> sc128(x, z, r, n);
+                default -> unreachable();
+            };
         }
 
         float m = 360F / checks;
@@ -446,6 +198,10 @@ public class CompiledStarcast {
         }
 
         return v / checks;
+    }
+
+    private static float unreachable() {
+        throw new AssertionError("unreachable: guard ensures 1..128");
     }
 
     private static float sc1(float x, float z, float r, NoiseProvider n) {
