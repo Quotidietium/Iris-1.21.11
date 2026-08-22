@@ -157,7 +157,8 @@ public class IrisDepositGenerator {
     }
 
     private BlockData nextBlock(RNG rngv, IrisData rdata) {
-        return getBlockData(rdata).get(rngv.i(0, getBlockData(rdata).size()));
+        KList<BlockData> palette = getBlockData(rdata);
+        return palette.get(rngv.i(0, palette.size()));
     }
 
     public KList<BlockData> getBlockData(IrisData rdata) {

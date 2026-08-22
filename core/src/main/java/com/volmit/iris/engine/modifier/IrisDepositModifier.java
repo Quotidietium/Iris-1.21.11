@@ -32,7 +32,6 @@ import com.volmit.iris.util.parallel.BurstExecutor;
 import com.volmit.iris.util.scheduling.PrecisionStopwatch;
 import org.bukkit.Material;
 import org.bukkit.block.data.BlockData;
-import org.bukkit.util.BlockVector;
 
 public class IrisDepositModifier extends EngineAssignedModifier<BlockData> {
     private final RNG rng;
@@ -83,6 +82,8 @@ public class IrisDepositModifier extends EngineAssignedModifier<BlockData> {
         if (k.getSpawnChance() < rng.d())
             return;
 
+        int engineHeight = getEngine().getHeight();
+
         for (int l = 0; l < rng.i(k.getMinPerChunk(), k.getMaxPerChunk() + 1); l++) {
             if (k.getPerClumpSpawnChance() < rng.d())
                 continue;
@@ -109,7 +110,7 @@ public class IrisDepositModifier extends EngineAssignedModifier<BlockData> {
 
             int minY = Math.max(0, k.getMinHeight());
             // TODO: WARNING HEIGHT
-            int maxY = Math.min(height, Math.min(getEngine().getHeight(), k.getMaxHeight()));
+            int maxY = Math.min(height, Math.min(engineHeight, k.getMaxHeight()));
 
             if (minY >= maxY)
                 continue;
@@ -119,22 +120,26 @@ public class IrisDepositModifier extends EngineAssignedModifier<BlockData> {
             if (y > k.getMaxHeight() || y < k.getMinHeight() || y > height - 2)
                 continue;
 
-            for (BlockVector j : clump.getBlocks().keys()) {
+            boolean replaceBedrock = k.isReplaceBedrock();
+            // Single-pass entry iteration: keys()+get(j) cost one BlockVector
+            // plus two boxed map keys and a double lookup per block.
+            clump.getBlocks().forEach((j, ore) -> {
                 int nx = j.getBlockX() + x;
                 int ny = j.getBlockY() + y;
                 int nz = j.getBlockZ() + z;
 
-                if (ny > height || nx > 15 || nx < 0 || ny > getEngine().getHeight() || ny < 0 || nz < 0 || nz > 15) {
-                    continue;
+                if (ny > height || nx > 15 || nx < 0 || ny > engineHeight || ny < 0 || nz < 0 || nz > 15) {
+                    return;
                 }
-                if (!k.isReplaceBedrock() && data.get(nx, ny, nz).getMaterial() == Material.BEDROCK) {
-                    continue;
+                BlockData cur = data.get(nx, ny, nz);
+                if (!replaceBedrock && cur.getMaterial() == Material.BEDROCK) {
+                    return;
                 }
 
                 if (chunk.get(nx, ny, nz, MatterCavern.class) == null) {
-                    data.set(nx, ny, nz, B.toDeepSlateOre(data.get(nx, ny, nz), clump.getBlocks().get(j)));
+                    data.set(nx, ny, nz, B.toDeepSlateOre(cur, ore));
                 }
-            }
+            });
         }
     }
 }
