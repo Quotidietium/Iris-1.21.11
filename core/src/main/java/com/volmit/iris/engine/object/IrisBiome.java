@@ -55,7 +55,17 @@ import java.awt.*;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class IrisBiome extends IrisRegistrant implements IRare {
-    private static final BlockData BARRIER = Material.BARRIER.createBlockData();
+    // Lazy holder: creating the BARRIER BlockData needs the Bukkit server; eager
+    // static init would break headless instantiation (only used by the explode
+    // palette debug mode, which never runs without a server anyway).
+    private static BlockData barrier() {
+        return BarrierHolder.BARRIER;
+    }
+
+    private static final class BarrierHolder {
+        private static final BlockData BARRIER = Material.BARRIER.createBlockData();
+    }
+
     private final transient AtomicCache<KMap<String, IrisBiomeGeneratorLink>> genCache = new AtomicCache<>();
     private final transient AtomicCache<KMap<String, Integer>> genCacheMax = new AtomicCache<>();
     private final transient AtomicCache<KMap<String, Integer>> genCacheMin = new AtomicCache<>();
@@ -170,6 +180,21 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     @Desc("Collection of ores to be generated")
     @ArrayType(type = IrisOreGenerator.class, min = 1)
     private KList<IrisOreGenerator> ores = new KList<>();
+
+    /**
+     * True if any configured ore wants the given placement (surface vs buried).
+     * When false, {@link #generateOres(int, int, int, RNG, IrisData, boolean)}
+     * deterministically returns null without touching rng, so per-block callers
+     * can skip the call entirely.
+     */
+    public boolean hasOres(boolean surface) {
+        for (IrisOreGenerator i : ores) {
+            if (i.isGenerateSurface() == surface) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     public BlockData generateOres(int x, int y, int z, RNG rng, IrisData data, boolean surface) {
         if (ores.isEmpty()) {
@@ -348,7 +373,7 @@ public class IrisBiome extends IrisRegistrant implements IRare {
 
             if (dim.isExplodeBiomePalettes()) {
                 for (int j = 0; j < dim.getExplodeBiomePaletteSize(); j++) {
-                    data.add(BARRIER);
+                    data.add(barrier());
 
                     if (data.size() >= maxDepth) {
                         break;
@@ -394,7 +419,7 @@ public class IrisBiome extends IrisRegistrant implements IRare {
 
             if (dim.isExplodeBiomePalettes()) {
                 for (int j = 0; j < dim.getExplodeBiomePaletteSize(); j++) {
-                    data.add(BARRIER);
+                    data.add(barrier());
 
                     if (data.size() >= maxDepth) {
                         break;

@@ -45,7 +45,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
-import org.bukkit.Material;
 import org.bukkit.World.Environment;
 import org.bukkit.block.data.BlockData;
 
@@ -58,8 +57,8 @@ import java.io.*;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class IrisDimension extends IrisRegistrant {
-    public static final BlockData STONE = Material.STONE.createBlockData();
-    public static final BlockData WATER = Material.WATER.createBlockData();
+    // STONE/WATER eager static BlockData constants removed: they were unreferenced
+    // and forced class-init to touch the Bukkit server (blocks headless unit tests).
     private final transient AtomicCache<Position2> parallaxSize = new AtomicCache<>();
     private final transient AtomicCache<CNG> rockLayerGenerator = new AtomicCache<>();
     private final transient AtomicCache<CNG> fluidLayerGenerator = new AtomicCache<>();
@@ -270,6 +269,20 @@ public class IrisDimension extends IrisRegistrant {
 
     public int getMinHeight() {
         return (int) getDimensionHeight().getMin();
+    }
+
+    /**
+     * True if any configured ore wants the given placement (surface vs buried).
+     * When false, generateOres deterministically returns null without touching
+     * rng, so per-block callers can skip the call entirely.
+     */
+    public boolean hasOres(boolean surface) {
+        for (IrisOreGenerator i : ores) {
+            if (i.isGenerateSurface() == surface) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public BlockData generateOres(int x, int y, int z, RNG rng, IrisData data, boolean surface) {

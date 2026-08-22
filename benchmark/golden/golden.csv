@@ -17,6 +17,8 @@ interp3d-trilinear-starcast6,da1906d4b823a00a,1000000
 worldcache2d,50d7df4049b7c4f,64000000
 worldcache2d-hit,ecae5689c7f8f625,64000000
 rng-column,b3472d2f8e31a39b,2000000
+terrain-col-legacy,13afa65a6f2ec5df,226000001
+terrain-col-fill,13afa65a6f2ec5df,226000001
 par-cng-noise2d,f4fe0a0b744aeb9,1200000
 par-worldcache2d,fbaec145ffdba49b,76800000
 par-worldcache2d-raster,dec9c15f134ca3ed,76800000

@@ -1,13 +1,21 @@
 package bench;
 
+import com.volmit.iris.core.loader.IrisData;
+import com.volmit.iris.engine.actuator.TerrainColumn;
+import com.volmit.iris.engine.object.IrisBiome;
+import com.volmit.iris.engine.object.IrisDimension;
+import com.volmit.iris.engine.object.IrisOreGenerator;
 import com.volmit.iris.engine.object.IRare;
+import com.volmit.iris.engine.object.IrisRegion;
 import com.volmit.iris.engine.object.IrisInterpolator;
+import com.volmit.iris.engine.object.IrisRange;
 import com.volmit.iris.engine.data.cache.Cache;
 import com.volmit.iris.util.cache.WorldCache2D;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.interpolation.InterpolationMethod;
 import com.volmit.iris.util.interpolation.InterpolationMethod3D;
 import com.volmit.iris.util.interpolation.IrisInterpolation;
+import com.volmit.iris.util.hunk.Hunk;
 import com.volmit.iris.util.math.RNG;
 import com.volmit.iris.util.noise.CNG;
 import com.volmit.iris.util.noise.NoiseType;
@@ -362,6 +370,156 @@ public final class Benchmark {
             return bh;
         }));
 
+        // ---- Terrain column fill (IrisTerrainNormalActuator per-column loop) ----
+        // Real IrisBiome/IrisRegion/IrisDimension objects with real ore lists.
+        // Ore palettes stay empty (the offline-safe common case): generateOres
+        // runs its null fast path, exercising the exact per-block dispatch the
+        // actuator pays; rng is never consumed by this configuration.
+        // terrain-col-legacy = verbatim pre-round-5 loop (per-block re-reads,
+        // unconditional 3-level ore checks); terrain-col-fill = the hoisted
+        // TerrainColumn.fill production path. Digests must match bit-exactly.
+        {
+            CNG heightNoise = CNG.signature(new RNG(4242));
+            IrisBiome tBiome = new IrisBiome();
+            IrisRegion tRegion = new IrisRegion();
+            IrisDimension tDimension = new IrisDimension();
+            tDimension.setFluidHeight(48);
+            {
+                // Typical pack: only the dimension configures (buried) ores;
+                // biome/region ore lists stay empty and no ore wants surface.
+                KList<IrisOreGenerator> ores = new KList<>();
+                ores.add(new IrisOreGenerator());
+                ores.add(new IrisOreGenerator().setRange(new IrisRange(5, 60)));
+                ores.add(new IrisOreGenerator().setRange(new IrisRange(10, 40)));
+                tDimension.setOres(ores);
+            }
+            RNG tRng = new RNG(777);
+            Double[] tHeights = new Double[256];
+            for (int i = 0; i < 256; i++) {
+                tHeights[i] = (double) heightNoise.fit(8, 96, (i >> 4) * 3, (i & 15) * 7);
+            }
+            Ctx2D<Double> heightCtx = new Ctx2D<>(tHeights);
+            Ctx2D<org.bukkit.block.data.BlockData> rockCtx = new Ctx2D<>(new org.bukkit.block.data.BlockData[256]);
+            Ctx2D<org.bukkit.block.data.BlockData> fluidCtx = new Ctx2D<>(new org.bukkit.block.data.BlockData[256]);
+            RecordingHunk tHunk = new RecordingHunk();
+
+            out.add(sc("terrain-col-legacy", (n, seed, dg) -> {
+                Random r = new Random(seed);
+                double bh = 0;
+                tHunk.dg = dg;
+                int lastBedrock = -1;
+                for (int op = 0; op < n; op++) {
+                    int xf = 7, zf = op & 15;
+                    int x = r.nextInt(100_000) - 50_000, z = r.nextInt(100_000) - 50_000;
+                    int realX = xf + x, realZ = zf + z;
+                    IrisBiome biome = tBiome;
+                    IrisRegion region = tRegion;
+                    IrisData data = null;
+                    int he = (int) Math.round(Math.min(tHunk.getHeight(), (Double) heightCtx.get(xf, zf)));
+                    int hf = Math.round(Math.max(Math.min(tHunk.getHeight(), tDimension.getFluidHeight()), he));
+                    if (hf < 0) {
+                        continue;
+                    }
+
+                    KList<org.bukkit.block.data.BlockData> blocks = null;
+                    KList<org.bukkit.block.data.BlockData> fblocks = null;
+                    int depth, fdepth;
+                    for (int i = hf; i >= 0; i--) {
+                        if (i >= tHunk.getHeight()) {
+                            continue;
+                        }
+
+                        if (i == 0) {
+                            if (tDimension.isBedrock()) {
+                                tHunk.set(xf, i, zf, null);
+                                lastBedrock = i;
+                                continue;
+                            }
+                        }
+
+                        org.bukkit.block.data.BlockData ore = biome.generateOres(realX, i, realZ, tRng, data, true);
+                        ore = ore == null ? region.generateOres(realX, i, realZ, tRng, data, true) : ore;
+                        ore = ore == null ? tDimension.generateOres(realX, i, realZ, tRng, data, true) : ore;
+                        if (ore != null) {
+                            tHunk.set(xf, i, zf, ore);
+                            continue;
+                        }
+
+                        if (i > he && i <= hf) {
+                            fdepth = hf - i;
+
+                            if (fblocks == null) {
+                                fblocks = biome.generateSeaLayers(realX, realZ, tRng, hf - he, data);
+                            }
+
+                            if (fblocks.hasIndex(fdepth)) {
+                                tHunk.set(xf, i, zf, fblocks.get(fdepth));
+                                continue;
+                            }
+
+                            tHunk.set(xf, i, zf, fluidCtx.get(xf, zf));
+                            continue;
+                        }
+
+                        if (i <= he) {
+                            depth = he - i;
+                            if (blocks == null) {
+                                blocks = biome.generateLayers(tDimension, realX, realZ, tRng, he, he, data, null);
+                            }
+
+                            if (blocks.hasIndex(depth)) {
+                                tHunk.set(xf, i, zf, blocks.get(depth));
+                                continue;
+                            }
+
+                            ore = biome.generateOres(realX, i, realZ, tRng, data, false);
+                            ore = ore == null ? region.generateOres(realX, i, realZ, tRng, data, false) : ore;
+                            ore = ore == null ? tDimension.generateOres(realX, i, realZ, tRng, data, false) : ore;
+
+                            if (ore != null) {
+                                tHunk.set(xf, i, zf, ore);
+                            } else {
+                                tHunk.set(xf, i, zf, rockCtx.get(xf, zf));
+                            }
+                        }
+                    }
+                }
+                dg.add(lastBedrock);
+                bh += lastBedrock;
+                return bh;
+            }));
+
+            out.add(sc("terrain-col-fill", (n, seed, dg) -> {
+                Random r = new Random(seed);
+                double bh = 0;
+                tHunk.dg = dg;
+                int lastBedrock = -1;
+                for (int op = 0; op < n; op++) {
+                    int xf = 7, zf = op & 15;
+                    int x = r.nextInt(100_000) - 50_000, z = r.nextInt(100_000) - 50_000;
+                    int realX = xf + x, realZ = zf + z;
+                    IrisBiome biome = tBiome;
+                    IrisRegion region = tRegion;
+                    IrisData data = null;
+                    int he = (int) Math.round(Math.min(tHunk.getHeight(), (Double) heightCtx.get(xf, zf)));
+                    int hf = Math.round(Math.max(Math.min(tHunk.getHeight(), tDimension.getFluidHeight()), he));
+                    if (hf < 0) {
+                        continue;
+                    }
+
+                    int bedrockAt = TerrainColumn.fill(xf, zf, realX, realZ, he, hf, tHunk.getHeight(), tHunk,
+                            biome, region, tDimension, data, null, tRng,
+                            rockCtx.get(xf, zf), fluidCtx.get(xf, zf), null, tDimension.isBedrock());
+                    if (bedrockAt >= 0) {
+                        lastBedrock = bedrockAt;
+                    }
+                }
+                dg.add(lastBedrock);
+                bh += lastBedrock;
+                return bh;
+            }));
+        }
+
         // ---- Parallel scenarios: shared engine objects across 8 threads ----
         WorldCache2D<Integer> sharedCache = new WorldCache2D<>((x, z) -> signature.fit(-100, 100, x, z), 1024);
         out.add(parallelScenario("par-cng-noise2d", 8, (nn, seed, dg) -> {
@@ -486,6 +644,50 @@ public final class Benchmark {
             }
             return bh;
         });
+    }
+
+    /** Minimal array-backed stand-in for ChunkedDataCache.get (same array-read shape). */
+    static final class Ctx2D<T> {
+        private final T[] data;
+
+        Ctx2D(T[] data) {
+            this.data = data;
+        }
+
+        T get(int x, int z) {
+            return data[(z * 16) + x];
+        }
+    }
+
+    /** Hunk that folds every set() into the benchmark digest (y + nullness). */
+    static final class RecordingHunk implements Hunk<org.bukkit.block.data.BlockData> {
+        Digest dg;
+
+        @Override
+        public int getWidth() {
+            return 16;
+        }
+
+        @Override
+        public int getDepth() {
+            return 16;
+        }
+
+        @Override
+        public int getHeight() {
+            return 256;
+        }
+
+        @Override
+        public void setRaw(int x, int y, int z, org.bukkit.block.data.BlockData t) {
+            dg.add(y);
+            dg.add(t == null ? 0L : 1L);
+        }
+
+        @Override
+        public org.bukkit.block.data.BlockData getRaw(int x, int y, int z) {
+            return null;
+        }
     }
 
     private static Scenario sc(String name, Op s) {

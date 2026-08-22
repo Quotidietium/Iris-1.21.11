@@ -151,6 +151,20 @@ public class IrisRegion extends IrisRegistrant implements IRare {
     @ArrayType(type = IrisOreGenerator.class, min = 1)
     private KList<IrisOreGenerator> ores = new KList<>();
 
+    /**
+     * True if any configured ore wants the given placement (surface vs buried).
+     * When false, generateOres deterministically returns null without touching
+     * rng, so per-block callers can skip the call entirely.
+     */
+    public boolean hasOres(boolean surface) {
+        for (IrisOreGenerator i : ores) {
+            if (i.isGenerateSurface() == surface) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public BlockData generateOres(int x, int y, int z, RNG rng, IrisData data, boolean surface) {
         if (ores.isEmpty()) {
             return null;

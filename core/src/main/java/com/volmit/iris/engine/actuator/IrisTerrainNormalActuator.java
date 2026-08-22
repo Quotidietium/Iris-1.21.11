@@ -18,11 +18,13 @@
 
 package com.volmit.iris.engine.actuator;
 
+import com.volmit.iris.core.loader.IrisData;
+import com.volmit.iris.engine.IrisComplex;
 import com.volmit.iris.engine.framework.Engine;
 import com.volmit.iris.engine.framework.EngineAssignedActuator;
 import com.volmit.iris.engine.object.IrisBiome;
+import com.volmit.iris.engine.object.IrisDimension;
 import com.volmit.iris.engine.object.IrisRegion;
-import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.context.ChunkContext;
 import com.volmit.iris.util.documentation.BlockCoordinates;
 import com.volmit.iris.util.hunk.Hunk;
@@ -74,9 +76,16 @@ public class IrisTerrainNormalActuator extends EngineAssignedActuator<BlockData>
      */
     @BlockCoordinates
     public void terrainSliver(int x, int z, int xf, Hunk<BlockData> h, ChunkContext context) {
-        int zf, realX, realZ, hf, he;
+        int zf, realX, realZ, he, hf;
         IrisBiome biome;
         IrisRegion region;
+
+        IrisDimension dimension = getDimension();
+        IrisData data = getData();
+        IrisComplex complex = getComplex();
+        int height = h.getHeight();
+        int fluidHeight = dimension.getFluidHeight();
+        boolean generateBedrock = dimension.isBedrock();
 
         for (zf = 0; zf < h.getDepth(); zf++) {
             realX = xf + x;
@@ -90,72 +99,11 @@ public class IrisTerrainNormalActuator extends EngineAssignedActuator<BlockData>
                 continue;
             }
 
-            KList<BlockData> blocks = null;
-            KList<BlockData> fblocks = null;
-            int depth, fdepth;
-            for (int i = hf; i >= 0; i--) {
-                if (i >= h.getHeight()) {
-                    continue;
-                }
-
-                if (i == 0) {
-                    if (getDimension().isBedrock()) {
-                        h.set(xf, i, zf, BEDROCK);
-                        lastBedrock = i;
-                        continue;
-                    }
-                }
-
-                BlockData ore = biome.generateOres(realX, i, realZ, rng, getData(), true);
-                ore = ore == null ? region.generateOres(realX, i, realZ, rng, getData(), true) : ore;
-                ore = ore == null ? getDimension().generateOres(realX, i, realZ, rng, getData(), true) : ore;
-                if (ore != null) {
-                    h.set(xf, i, zf, ore);
-                    continue;
-                }
-
-                if (i > he && i <= hf) {
-                    fdepth = hf - i;
-
-                    if (fblocks == null) {
-                        fblocks = biome.generateSeaLayers(realX, realZ, rng, hf - he, getData());
-                    }
-
-                    if (fblocks.hasIndex(fdepth)) {
-                        h.set(xf, i, zf, fblocks.get(fdepth));
-                        continue;
-                    }
-
-                    h.set(xf, i, zf, context.getFluid().get(xf, zf));
-                    continue;
-                }
-
-                if (i <= he) {
-                    depth = he - i;
-                    if (blocks == null) {
-                        blocks = biome.generateLayers(getDimension(), realX, realZ, rng,
-                                he,
-                                he,
-                                getData(),
-                                getComplex());
-                    }
-
-
-                    if (blocks.hasIndex(depth)) {
-                        h.set(xf, i, zf, blocks.get(depth));
-                        continue;
-                    }
-
-                    ore = biome.generateOres(realX, i, realZ, rng, getData(), false);
-                    ore = ore == null ? region.generateOres(realX, i, realZ, rng, getData(), false) : ore;
-                    ore = ore == null ? getDimension().generateOres(realX, i, realZ, rng, getData(), false) : ore;
-
-                    if (ore != null) {
-                        h.set(xf, i, zf, ore);
-                    } else {
-                        h.set(xf, i, zf, context.getRock().get(xf, zf));
-                    }
-                }
+            int bedrockAt = TerrainColumn.fill(xf, zf, realX, realZ, he, hf, height, h,
+                    biome, region, dimension, data, complex, rng,
+                    context.getRock().get(xf, zf), context.getFluid().get(xf, zf), BEDROCK, generateBedrock);
+            if (bedrockAt >= 0) {
+                lastBedrock = bedrockAt;
             }
         }
     }
