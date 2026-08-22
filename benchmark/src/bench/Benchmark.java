@@ -818,6 +818,174 @@ public final class Benchmark {
                 });
             }
 
+            // ---- Decorator path: per-column selection + surface placement ----
+            // Real IrisSurfaceDecorator against a JDK-proxy Engine (SeedManager,
+            // IrisData on a scratch folder and the dimension POJO are all REAL;
+            // only the Engine shell is a proxy). The biome carries 6 decorators
+            // spanning all 5 decoration parts like a pack-scale list, so the
+            // selection loop pays the same partOf scan as production.
+            // decorator-select: real getRNG + getDecorator per column, digesting
+            // the picked decorator index. decorator-decorate: full decorate()
+            // incl. palette pick, stacking loop and hunk writes folded into the
+            // digest via Hunk.listen.
+            {
+                final com.volmit.iris.engine.framework.Engine benchEngine;
+                {
+                    java.util.Map<String, Object> hard = new java.util.HashMap<>();
+                    hard.put("getCacheID", 123456);
+                    hard.put("getSeedManager",
+                            new com.volmit.iris.engine.framework.SeedManager(1234567L));
+                    hard.put("getData", com.volmit.iris.core.loader.IrisData.get(
+                            new java.io.File("benchmark/results/_decodata")));
+                    hard.put("getDimension", new com.volmit.iris.engine.object.IrisDimension()
+                            .setName("bench-dim").setFluidHeight(62));
+                    java.lang.reflect.InvocationHandler h = (proxy, method, args) -> {
+                        Object v = hard.get(method.getName());
+                        if (v != null) {
+                            return v;
+                        }
+                        Class<?> rt = method.getReturnType();
+                        if (rt == boolean.class) return false;
+                        if (rt == long.class) return 0L;
+                        if (rt == int.class) return 0;
+                        if (rt == double.class) return 0D;
+                        if (rt == float.class) return 0F;
+                        if (rt == short.class) return (short) 0;
+                        if (rt == byte.class) return (byte) 0;
+                        if (rt == char.class) return (char) 0;
+                        return null;
+                    };
+                    benchEngine = (com.volmit.iris.engine.framework.Engine)
+                            java.lang.reflect.Proxy.newProxyInstance(
+                                    Benchmark.class.getClassLoader(),
+                                    new Class[]{com.volmit.iris.engine.framework.Engine.class}, h);
+                }
+
+                final com.volmit.iris.engine.object.IrisBiome biome =
+                        new com.volmit.iris.engine.object.IrisBiome()
+                                .setName("bench-biome")
+                                .setInferredType(com.volmit.iris.engine.object.InferredType.LAND);
+                {
+                    com.volmit.iris.util.collection.KList<com.volmit.iris.engine.object.IrisDecorator> ds =
+                            new com.volmit.iris.util.collection.KList<>();
+                    // Surface candidates (partOf NONE): flat grass + stacking flowers
+                    ds.add(new com.volmit.iris.engine.object.IrisDecorator()
+                            .setChance(0.5));
+                    com.volmit.iris.engine.object.IrisDecorator flowers =
+                            new com.volmit.iris.engine.object.IrisDecorator()
+                                    .setChance(0.35)
+                                    .setStackMin(1).setStackMax(3).setTopThreshold(0.9)
+                                    .setTopPalette(new com.volmit.iris.util.collection.KList<com.volmit.iris.engine.object.IrisBlockData>()
+                                            .qadd(new com.volmit.iris.engine.object.IrisBlockData("oxeye_daisy")))
+                                    .setVariance(com.volmit.iris.engine.object.NoiseStyle.STATIC.style());
+                    flowers.add("poppy");
+                    flowers.add("dandelion");
+                    ds.add(flowers);
+                    // Non-surface parts: always scanned, never picked by the surface decorator
+                    com.volmit.iris.engine.object.IrisDecorator cane =
+                            new com.volmit.iris.engine.object.IrisDecorator()
+                                    .setChance(0.5)
+                                    .setPartOf(com.volmit.iris.engine.object.IrisDecorationPart.SHORE_LINE);
+                    cane.add("sugar_cane");
+                    ds.add(cane);
+                    com.volmit.iris.engine.object.IrisDecorator lily =
+                            new com.volmit.iris.engine.object.IrisDecorator()
+                                    .setChance(0.5)
+                                    .setPartOf(com.volmit.iris.engine.object.IrisDecorationPart.SEA_SURFACE);
+                    lily.add("lily_pad");
+                    ds.add(lily);
+                    com.volmit.iris.engine.object.IrisDecorator seagrass =
+                            new com.volmit.iris.engine.object.IrisDecorator()
+                                    .setChance(0.5)
+                                    .setPartOf(com.volmit.iris.engine.object.IrisDecorationPart.SEA_FLOOR);
+                    seagrass.add("seagrass");
+                    ds.add(seagrass);
+                    com.volmit.iris.engine.object.IrisDecorator lichen =
+                            new com.volmit.iris.engine.object.IrisDecorator()
+                                    .setChance(0.5)
+                                    .setPartOf(com.volmit.iris.engine.object.IrisDecorationPart.CEILING);
+                    lichen.add("glow_lichen");
+                    ds.add(lichen);
+                    biome.setDecorators(ds);
+                }
+
+                class BenchSurfaceDecorator extends com.volmit.iris.engine.decorator.IrisSurfaceDecorator {
+                    BenchSurfaceDecorator(com.volmit.iris.engine.framework.Engine e) {
+                        super(e);
+                    }
+
+                    int select(int x, int z, com.volmit.iris.engine.object.IrisBiome b) {
+                        return indexOf(b, getDecorator(getRNG(x, z), b, x, z));
+                    }
+
+                    void decorateColumn(int i, int j, int realX, int realZ,
+                                        Hunk<BlockData> hunk,
+                                        com.volmit.iris.engine.object.IrisBiome b,
+                                        int height, int max) {
+                        decorate(i, j, realX, realX + 1, realX - 1,
+                                realZ, realZ + 1, realZ - 1, hunk, b, height, max);
+                    }
+
+                    private int indexOf(com.volmit.iris.engine.object.IrisBiome b,
+                                        com.volmit.iris.engine.object.IrisDecorator d) {
+                        return d == null ? -1 : b.getDecorators().indexOf(d);
+                    }
+                }
+                final BenchSurfaceDecorator surface = new BenchSurfaceDecorator(benchEngine);
+
+                out.add(sc("decorator-select", (n, seed, dg) -> {
+                    Random r = new Random(seed);
+                    double bh = 0;
+                    for (int i = 0; i < n; i++) {
+                        int x = r.nextInt(1 << 20), z = r.nextInt(1 << 20);
+                        int pick = surface.select(x, z, biome);
+                        dg.add(pick);
+                        bh += pick;
+                    }
+                    return bh;
+                }));
+
+                final Hunk<BlockData> hunkBase = Hunk.newArrayHunk(16, 96, 16);
+                final Digest[] writeDigest = new Digest[1];
+                final Hunk<BlockData> hunk = hunkBase.listen((x, y, z, t) -> {
+                    Digest d = writeDigest[0];
+                    d.add(x);
+                    d.add(y);
+                    d.add(z);
+                    d.add(t == null ? -1 : t.getMaterial().ordinal());
+                });
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "decorator-decorate";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 100_000;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        writeDigest[0] = dg;
+                        Random r = new Random(seed);
+                        double bh = 0;
+                        for (int i = 0; i < n; i++) {
+                            int baseX = r.nextInt(1 << 18), baseZ = r.nextInt(1 << 18);
+                            int k = i & 255;
+                            int xi = k & 15, zi = k >> 4;
+                            int realX = baseX + xi, realZ = baseZ + zi;
+                            int height = 60 + ((realX * 31 + realZ * 17) >> 3 & 15);
+                            surface.decorateColumn(xi, zi, realX, realZ, hunk, biome,
+                                    height, 96 - height);
+                            bh += height;
+                        }
+                        writeDigest[0] = null;
+                        return bh;
+                    }
+                });
+            }
+
             // HyperLock: hit-pattern lock/unlock through with(x, z, runnable)
             // (region keys repeat, like Mantle region locking in production).
             HyperLock hl = new HyperLock(1024);

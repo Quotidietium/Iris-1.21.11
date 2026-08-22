@@ -55,6 +55,12 @@ public class Iris extends com.volmit.iris.util.plugin.VolmitPlugin {
     }
 
     public static <T> T service(Class<T> c) {
+        // IrisData's loader construction registers its KCache with the
+        // preservation service; the real class is offline-safe (registerCache
+        // only appends a WeakReference), so hand out a bare instance.
+        if (c == com.volmit.iris.core.service.PreservationSVC.class) {
+            return c.cast(new com.volmit.iris.core.service.PreservationSVC());
+        }
         return null;
     }
 
