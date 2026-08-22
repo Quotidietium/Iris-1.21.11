@@ -187,15 +187,36 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
             Iris.error("Mantle Writer Accessed chunk out of bounds" + cx + "," + cz);
             return null;
         }
-        final Long key = Cache.key(cx, cz);
+        final long key = Cache.key(cx, cz);
+        // Block writes cluster within one chunk; an atomically-swapped memo of
+        // the last chunk skips the map (and its boxed lookup) on the hot path.
+        // Same (cx, cz) always maps to the same chunk instance, so a stale memo
+        // can only cause a redundant map lookup, never a wrong chunk.
+        ChunkMemo m = memo;
+        if (m != null && m.key == key) {
+            return m.chunk;
+        }
         MantleChunk chunk = cachedChunks.get(key);
         if (chunk == null) {
             chunk = mantle.getChunk(cx, cz).use();
             var old = cachedChunks.put(key, chunk);
             if (old != null) old.release();
         }
+        memo = new ChunkMemo(key, chunk);
         return chunk;
     }
+
+    private static final class ChunkMemo {
+        final long key;
+        final MantleChunk chunk;
+
+        ChunkMemo(long key, MantleChunk chunk) {
+            this.key = key;
+            this.chunk = chunk;
+        }
+    }
+
+    private volatile ChunkMemo memo;
 
     @Override
     public int getHighest(int x, int z, IrisData data) {

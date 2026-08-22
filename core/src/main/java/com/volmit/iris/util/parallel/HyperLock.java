@@ -18,7 +18,6 @@
 
 package com.volmit.iris.util.parallel;
 
-import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import com.volmit.iris.Iris;
 import com.volmit.iris.engine.data.cache.Cache;
 import com.volmit.iris.util.function.NastyRunnable;
@@ -30,10 +29,22 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
+/**
+ * Key-space striped lock manager. Every (x, z) key maps to one of a fixed,
+ * power-of-two pool of {@link ReentrantLock}s (fibonacci-hashed so clustered
+ * coordinates spread evenly).
+ *
+ * <p>Compared to the previous bounded LRU lock cache, mutual exclusion per key
+ * is preserved (colliding keys additionally exclude each other, which only
+ * over-serializes), while lock acquisition no longer allocates a boxed key or
+ * maintains LRU recency on every hit. A fixed pool also cannot evict a lock
+ * that is currently held.</p>
+ */
 public class HyperLock {
-    private final ConcurrentLinkedHashMap<Long, ReentrantLock> locks;
-    private boolean enabled = true;
-    private boolean fair = false;
+    private static final int MIN_STRIPES = 64;
+    private final ReentrantLock[] locks;
+    private final int indexShift;
+    private volatile boolean enabled = true;
 
     public HyperLock() {
         this(1024, false);
@@ -44,17 +55,17 @@ public class HyperLock {
     }
 
     public HyperLock(int capacity, boolean fair) {
-        this.fair = fair;
-        locks = new ConcurrentLinkedHashMap.Builder<Long, ReentrantLock>()
-                .initialCapacity(capacity)
-                .maximumWeightedCapacity(capacity)
-                .listener((k, v) -> {
-                    if (v.isLocked() || v.isHeldByCurrentThread()) {
-                        Iris.warn("InfiniLock Eviction of " + k + " still has locks on it!");
-                    }
-                })
-                .concurrencyLevel(32)
-                .build();
+        int stripes = Math.max(MIN_STRIPES, Integer.highestOneBit(Math.max(capacity - 1, 1)) << 1);
+        locks = new ReentrantLock[stripes];
+        for (int i = 0; i < stripes; i++) {
+            locks[i] = new ReentrantLock(fair);
+        }
+        indexShift = 64 - Integer.numberOfTrailingZeros(stripes);
+    }
+
+    private ReentrantLock getLock(int x, int z) {
+        long key = Cache.key(x, z) * 0x9E3779B97F4A7C15L;
+        return locks[(int) (key >>> indexShift)];
     }
 
     public void with(int x, int z, Runnable r) {
@@ -140,10 +151,6 @@ public class HyperLock {
         return false;
     }
 
-    private ReentrantLock getLock(int x, int z) {
-        return locks.computeIfAbsent(Cache.key(x, z), k -> new ReentrantLock(fair));
-    }
-
     public void lock(int x, int z) {
         if (!enabled) {
             return;
@@ -162,6 +169,8 @@ public class HyperLock {
 
     public void disable() {
         enabled = false;
-        locks.values().forEach(ReentrantLock::lock);
+        for (ReentrantLock lock : locks) {
+            lock.lock();
+        }
     }
 }

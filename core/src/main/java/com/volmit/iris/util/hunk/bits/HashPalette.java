@@ -23,19 +23,20 @@ import com.volmit.iris.util.function.Consumer2;
 
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.LinkedHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 public class HashPalette<T> implements Palette<T> {
     private final Object lock = new Object();
     private final KMap<T, Integer> palette;
-    private final KMap<Integer, T> lookup;
+    private volatile AtomicReferenceArray<T> byId;
     private final AtomicInteger size;
 
     public HashPalette() {
         this.size = new AtomicInteger(1);
         this.palette = new KMap<>();
-        this.lookup = new KMap<>();
+        this.byId = new AtomicReferenceArray<>(16);
+        byId.set(0, null);
     }
 
     @Override
@@ -44,7 +45,8 @@ public class HashPalette<T> implements Palette<T> {
             return null;
         }
 
-        return lookup.get(id);
+        AtomicReferenceArray<T> a = byId;
+        return id < a.length() ? a.get(id) : null;
     }
 
     @Override
@@ -56,7 +58,8 @@ public class HashPalette<T> implements Palette<T> {
         return palette.computeIfAbsent(t, $ -> {
             synchronized (lock) {
                 int index = size.getAndIncrement();
-                lookup.put(index, t);
+                ensureCapacity(index);
+                byId.set(index, t);
                 return index;
             }
         });
@@ -80,8 +83,10 @@ public class HashPalette<T> implements Palette<T> {
     @Override
     public void iterate(Consumer2<T, Integer> c) {
         synchronized (lock) {
-            for (int i = 1; i < size.get(); i++) {
-                c.accept(lookup.get(i), i);
+            AtomicReferenceArray<T> a = byId;
+            int n = Math.min(size.get(), a.length());
+            for (int i = 1; i < n; i++) {
+                c.accept(a.get(i), i);
             }
         }
     }
@@ -90,8 +95,9 @@ public class HashPalette<T> implements Palette<T> {
     public Palette<T> from(Palette<T> oldPalette) {
         oldPalette.iterate((t, i) -> {
             if (t == null) throw new NullPointerException("Null palette entries are not allowed!");
-            lookup.put(i, t);
             palette.put(t, i);
+            ensureCapacity(i);
+            byId.set(i, t);
         });
         size.set(oldPalette.size() + 1);
         return this;
@@ -102,10 +108,30 @@ public class HashPalette<T> implements Palette<T> {
         for (int i = 1; i <= size; i++) {
             T t = writable.readNodeData(in);
             if (t == null) throw new NullPointerException("Null palette entries are not allowed!");
-            lookup.put(i, t);
             palette.put(t, i);
+            ensureCapacity(i);
+            byId.set(i, t);
         }
         this.size.set(size + 1);
         return this;
+    }
+
+    private void ensureCapacity(int index) {
+        if (index >= byId.length()) {
+            grow(index);
+        }
+    }
+
+    private synchronized void grow(int lastIndex) {
+        if (lastIndex < byId.length()) {
+            return;
+        }
+
+        AtomicReferenceArray<T> a = new AtomicReferenceArray<>(Math.max(lastIndex + 1, byId.length() * 2));
+        for (int i = 0; i < byId.length(); i++) {
+            a.set(i, byId.get(i));
+        }
+
+        byId = a;
     }
 }

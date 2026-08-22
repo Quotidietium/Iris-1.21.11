@@ -28,7 +28,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class DataContainer<T> {
     private static final boolean TRIM = Boolean.getBoolean("iris.trim-palette");
     protected static final int INITIAL_BITS = 3;
-    protected static final int LINEAR_BITS_LIMIT = 4;
+    /**
+     * Palette crossover: at most 2^2 = 4 ids live in the scan-backed
+     * LinearPalette; anything larger uses the hash-backed palette. Both
+     * implementations assign sequential insertion-order ids and derive bit
+     * width from size, so the serialized form is identical either way.
+     */
+    protected static final int LINEAR_BITS_LIMIT = 2;
     protected static final int LINEAR_INITIAL_LENGTH = (int) Math.pow(2, LINEAR_BITS_LIMIT) + 2;
     protected static final int[] BIT = computeBitLimits();
     private final Lock read, write;
@@ -132,23 +138,13 @@ public class DataContainer<T> {
     public void set(int position, T t) {
         int id;
 
-        read.lock();
+        write.lock();
         try {
             id = palette.id(t);
             if (id == -1) {
                 id = palette.add(t);
-                if (palette.bits() == data.getBits()) {
-                    data.set(position, id);
-                    return;
-                }
+                updateBits();
             }
-        } finally {
-            read.unlock();
-        }
-
-        write.lock();
-        try {
-            updateBits();
             data.set(position, id);
         } finally {
             write.unlock();
@@ -188,21 +184,32 @@ public class DataContainer<T> {
     }
 
     private void trim() {
-        var ints = new Int2IntRBTreeMap();
+        int paletteSize = palette.size();
+        // Histogram of used palette ids; ids are <= palette.size().
+        int[] used = new int[paletteSize + 2];
+        int distinct = 0;
         for (int i = 0; i < length; i++) {
             int x = data.get(i);
-            if (x <= 0) continue;
-            ints.put(x, x);
+            if (x <= 0 || x > paletteSize) continue;
+            if (used[x]++ == 0) distinct++;
         }
-        if (ints.size() == palette.size())
+        if (distinct == paletteSize)
             return;
 
-        int bits = bits(ints.size() + 1);
+        int bits = bits(distinct + 1);
         var trimmed = newPalette(bits);
-        ints.replaceAll((k, v) -> trimmed.add(palette.get(k)));
+        // Re-add survivors in ascending old-id order (same mapping order the
+        // previous tree-map implementation produced).
+        int[] remap = new int[paletteSize + 2];
+        for (int id = 1; id <= paletteSize; id++) {
+            if (used[id] > 0) {
+                remap[id] = trimmed.add(palette.get(id));
+            }
+        }
         var tBits = new DataBits(bits, length);
         for (int i = 0; i < length; i++) {
-            tBits.set(i, ints.get(data.get(i)));
+            int x = data.get(i);
+            tBits.set(i, x <= 0 || x > paletteSize ? 0 : remap[x]);
         }
 
         data = tBits;

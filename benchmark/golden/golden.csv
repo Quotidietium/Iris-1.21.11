@@ -22,3 +22,9 @@ terrain-col-fill,13afa65a6f2ec5df,226000001
 par-cng-noise2d,f4fe0a0b744aeb9,1200000
 par-worldcache2d,fbaec145ffdba49b,76800000
 par-worldcache2d-raster,dec9c15f134ca3ed,76800000
+datacontainer-set,a187ec0ba7854750,1000000
+datacontainer-get,64bea9d0e4f74b9,1000000
+mantlechunk-set,cf23464c26708dcb,1000000
+matter-roundtrip,bca8891cf369e6bd,8193000
+hyperlock-hit,baa1fd4c991c7e9f,1
+par-hyperlock-contended,8a08dbb6ddacc4f7,16

@@ -194,11 +194,15 @@ public interface MatterSlice<T> extends Hunk<T>, PaletteType<T>, Writable<T> {
         MatterPalette<T> palette = new MatterPalette<T>(this, din);
         if (din.readBoolean()) {
             int nodes = Varint.readUnsignedVarInt(din);
-            int[] pos;
 
             while (nodes-- > 0) {
-                pos = Cache.to3D(Varint.readUnsignedVarInt(din), w, h);
-                setRaw(pos[0], pos[1], pos[2], palette.readNode(din));
+                // Inline inverse of Cache.to1D (z*w*h + y*w + x); avoids an
+                // int[3] allocation per node on sparse (mapped) slices.
+                int p = Varint.readUnsignedVarInt(din);
+                int x = p % w;
+                int y = (p / w) % h;
+                int z = p / (w * h);
+                setRaw(x, y, z, palette.readNode(din));
             }
         } else {
             iterateSyncIO((x, y, z, b) -> setRaw(x, y, z, palette.readNode(din)));
