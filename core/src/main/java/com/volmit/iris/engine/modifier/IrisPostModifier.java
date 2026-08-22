@@ -34,7 +34,6 @@ import org.bukkit.block.data.MultipleFacing;
 import org.bukkit.block.data.Waterlogged;
 import org.bukkit.block.data.type.Slab;
 
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class IrisPostModifier extends EngineAssignedModifier<BlockData> {
     private static final BlockData AIR = B.get("AIR");
@@ -49,21 +48,23 @@ public class IrisPostModifier extends EngineAssignedModifier<BlockData> {
     @Override
     public void onModify(int x, int z, Hunk<BlockData> output, boolean multicore, ChunkContext context) {
         PrecisionStopwatch p = PrecisionStopwatch.start();
-        AtomicInteger i = new AtomicInteger();
-        AtomicInteger j = new AtomicInteger();
         Hunk<BlockData> sync = output.synchronize();
-        for (i.set(0); i.get() < output.getWidth(); i.getAndIncrement()) {
-            for (j.set(0); j.get() < output.getDepth(); j.getAndIncrement()) {
-                int ii = i.get();
-                int jj = j.get();
-                post(ii, jj, sync, ii + x, jj + z, context);
+        // Dimension flags are per-engine constants; hoisting them out of the
+        // per-column loop saves the engine->dimension chain on every column.
+        final boolean walls = getDimension().isPostProcessingWalls();
+        final boolean slabs = getDimension().isPostProcessingSlabs();
+        final int fluidHeight = getDimension().getFluidHeight();
+        for (int i = 0; i < output.getWidth(); i++) {
+            for (int j = 0; j < output.getDepth(); j++) {
+                post(i, j, sync, i + x, j + z, context, walls, slabs, fluidHeight);
             }
         }
 
         getEngine().getMetrics().getPost().put(p.getMilliseconds());
     }
 
-    private void post(int currentPostX, int currentPostZ, Hunk<BlockData> currentData, int x, int z, ChunkContext context) {
+    private void post(int currentPostX, int currentPostZ, Hunk<BlockData> currentData, int x, int z, ChunkContext context,
+                      boolean walls, boolean slabs, int fluidHeight) {
         int h = getEngine().getMantle().trueHeight(x, z);
         int ha = getEngine().getMantle().trueHeight(x + 1, z);
         int hb = getEngine().getMantle().trueHeight(x, z + 1);
@@ -140,7 +141,7 @@ public class IrisPostModifier extends EngineAssignedModifier<BlockData> {
         // Wall Patcher
         IrisBiome biome = context.getBiome().get(currentPostX, currentPostZ);
 
-        if (getDimension().isPostProcessingWalls()) {
+        if (walls) {
             if (!biome.getWall().getPalette().isEmpty()) {
                 if (ha < h - 2 || hb < h - 2 || hc < h - 2 || hd < h - 2) {
                     boolean brokeGround = false;
@@ -167,7 +168,7 @@ public class IrisPostModifier extends EngineAssignedModifier<BlockData> {
         }
 
         // Slab
-        if (getDimension().isPostProcessingSlabs()) {
+        if (slabs) {
             //@builder
             if ((ha == h + 1 && isSolidNonSlab(x + 1, ha, z, currentPostX, currentPostZ, currentData))
                     || (hb == h + 1 && isSolidNonSlab(x, hb, z + 1, currentPostX, currentPostZ, currentData))
@@ -181,7 +182,7 @@ public class IrisPostModifier extends EngineAssignedModifier<BlockData> {
                 if (d != null) {
                     boolean cancel = B.isAir(d);
 
-                    if (d.getMaterial().equals(Material.SNOW) && h + 1 <= getDimension().getFluidHeight()) {
+                    if (d.getMaterial().equals(Material.SNOW) && h + 1 <= fluidHeight) {
                         cancel = true;
                     }
 
@@ -204,7 +205,7 @@ public class IrisPostModifier extends EngineAssignedModifier<BlockData> {
             Waterlogged ww = (Waterlogged) b.clone();
             boolean w = false;
 
-            if (h <= getDimension().getFluidHeight() + 1) {
+            if (h <= fluidHeight + 1) {
                 if (isWaterOrWaterlogged(x, h + 1, z, currentPostX, currentPostZ, currentData)) {
                     w = true;
                 } else if ((isWaterOrWaterlogged(x + 1, h, z, currentPostX, currentPostZ, currentData) || isWaterOrWaterlogged(x - 1, h, z, currentPostX, currentPostZ, currentData) || isWaterOrWaterlogged(x, h, z + 1, currentPostX, currentPostZ, currentData) || isWaterOrWaterlogged(x, h, z - 1, currentPostX, currentPostZ, currentData))) {
@@ -216,7 +217,7 @@ public class IrisPostModifier extends EngineAssignedModifier<BlockData> {
                 ww.setWaterlogged(w);
                 setPostBlock(x, h, z, ww, currentPostX, currentPostZ, currentData);
             }
-        } else if (b.getMaterial().equals(Material.AIR) && h <= getDimension().getFluidHeight()) {
+        } else if (b.getMaterial().equals(Material.AIR) && h <= fluidHeight) {
             if ((isWaterOrWaterlogged(x + 1, h, z, currentPostX, currentPostZ, currentData) || isWaterOrWaterlogged(x - 1, h, z, currentPostX, currentPostZ, currentData) || isWaterOrWaterlogged(x, h, z + 1, currentPostX, currentPostZ, currentData) || isWaterOrWaterlogged(x, h, z - 1, currentPostX, currentPostZ, currentData))) {
                 setPostBlock(x, h, z, WATER, currentPostX, currentPostZ, currentData);
             }
