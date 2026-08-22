@@ -177,6 +177,10 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     @Desc("Define biome deposit generators that add onto the existing regional and global deposit generators")
     private KList<IrisDepositGenerator> deposits = new KList<>();
     private transient InferredType inferredType;
+    // partOf partition of the decorator list, built lazily. Plain volatile with
+    // a benign race (each racer publishes an equal-content array; decorators
+    // are fixed after load) keeps the read path allocation- and lock-free.
+    private transient volatile KList<IrisDecorator>[] decoratorsByPart;
     @Desc("Collection of ores to be generated")
     @ArrayType(type = IrisOreGenerator.class, min = 1)
     private KList<IrisOreGenerator> ores = new KList<>();
@@ -194,6 +198,37 @@ public class IrisBiome extends IrisRegistrant implements IRare {
             }
         }
         return false;
+    }
+
+    /**
+     * Decorators whose partOf matches the given part. The partOf test is
+     * position-independent, so the partition is computed once per biome
+     * instead of rescanning the full decorator list per decorated column.
+     */
+    public KList<IrisDecorator> getDecorators(IrisDecorationPart part) {
+        KList<IrisDecorator>[] partition = decoratorsByPart;
+        if (partition == null) {
+            partition = partitionDecorators();
+            decoratorsByPart = partition;
+        }
+        return partition[part.ordinal()];
+    }
+
+    @SuppressWarnings("unchecked")
+    private KList<IrisDecorator>[] partitionDecorators() {
+        KList<IrisDecorator>[] byPart = new KList[IrisDecorationPart.values().length];
+        for (IrisDecorationPart p : IrisDecorationPart.values()) {
+            byPart[p.ordinal()] = new KList<>();
+        }
+        for (IrisDecorator i : decorators) {
+            try {
+                byPart[i.getPartOf().ordinal()].add(i);
+            } catch (Throwable e) {
+                Iris.reportError(e);
+                Iris.error("PART OF: " + getLoadFile().getAbsolutePath() + " HAS AN INVALID DECORATOR near 'partOf'!!!");
+            }
+        }
+        return byPart;
     }
 
     public BlockData generateOres(int x, int y, int z, RNG rng, IrisData data, boolean surface) {

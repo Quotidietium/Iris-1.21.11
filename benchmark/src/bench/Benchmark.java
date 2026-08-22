@@ -130,7 +130,11 @@ public final class Benchmark {
 
         try (PrintWriter w = new PrintWriter(out, "UTF-8")) {
             w.println("scenario,iteration,seed,ops,ns_per_op,bytes_per_op,digest,samples");
+            String filter = System.getProperty("bench.filter", "");
             for (Scenario s : scenarios) {
+                if (!filter.isEmpty() && !s.name().contains(filter)) {
+                    continue;
+                }
                 for (int i = 0; i < warmups; i++) {
                     s.run(Math.min(200_000, s.ops()), 424242L + i, new Digest());
                 }

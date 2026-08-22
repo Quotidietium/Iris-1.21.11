@@ -43,6 +43,8 @@ public class IrisDecorator {
     private final transient AtomicCache<CNG> heightGenerator = new AtomicCache<>();
     private final transient AtomicCache<KList<BlockData>> blockData = new AtomicCache<>();
     private final transient AtomicCache<KList<BlockData>> blockDataTops = new AtomicCache<>();
+    private final transient AtomicCache<KList<BlockData>> whitelistBlockData = new AtomicCache<>();
+    private final transient AtomicCache<KList<BlockData>> blacklistBlockData = new AtomicCache<>();
     @Desc("The varience dispersion is used when multiple blocks are put in the palette. Scatter scrambles them, Wispy shows streak-looking varience")
     private IrisGeneratorStyle variance = NoiseStyle.STATIC.style();
     @Desc("Forcefully place this decorant anywhere it is supposed to go even if it should not go on a specific surface block. For example, you could force tallgrass to place on top of stone by using this.")
@@ -135,7 +137,8 @@ public class IrisDecorator {
     }
 
     public BlockData getBlockData(IrisBiome b, RNG rng, double x, double z, IrisData data) {
-        if (getBlockData(data).isEmpty()) {
+        KList<BlockData> palette = getBlockData(data);
+        if (palette.isEmpty()) {
             Iris.warn("Empty Block Data for " + b.getName());
             return null;
         }
@@ -144,18 +147,19 @@ public class IrisDecorator {
         double zz = z / style.getZoom();
 
         if (getGenerator(rng, data).fitDouble(0D, 1D, xx, zz) <= chance) {
-            if (getBlockData(data).size() == 1) {
-                return getBlockData(data).get(0);
+            if (palette.size() == 1) {
+                return palette.get(0);
             }
 
-            return getVarianceGenerator(rng, data).fit(getBlockData(data), z, x); //X and Z must be switched
+            return getVarianceGenerator(rng, data).fit(palette, z, x); //X and Z must be switched
         }
 
         return null;
     }
 
     public BlockData getBlockData100(IrisBiome b, RNG rng, double x, double y, double z, IrisData data) {
-        if (getBlockData(data).isEmpty()) {
+        KList<BlockData> palette = getBlockData(data);
+        if (palette.isEmpty()) {
             Iris.warn("Empty Block Data for " + b.getName());
             return null;
         }
@@ -170,15 +174,16 @@ public class IrisDecorator {
             zz = z / style.getZoom();
         }
 
-        if (getBlockData(data).size() == 1) {
-            return getBlockData(data).get(0);
+        if (palette.size() == 1) {
+            return palette.get(0);
         }
 
-        return getVarianceGenerator(rng, data).fit(getBlockData(data), z, y, x).clone(); //X and Z must be switched
+        return getVarianceGenerator(rng, data).fit(palette, z, y, x).clone(); //X and Z must be switched
     }
 
     public BlockData getBlockDataForTop(IrisBiome b, RNG rng, double x, double y, double z, IrisData data) {
-        if (getBlockDataTops(data).isEmpty()) {
+        KList<BlockData> tops = getBlockDataTops(data);
+        if (tops.isEmpty()) {
             return getBlockData100(b, rng, x, y, z, data);
         }
 
@@ -187,10 +192,10 @@ public class IrisDecorator {
 
         if (getGenerator(rng, data).fitDouble(0D, 1D, xx, zz) <= chance) { //Exclude y from here
             if (getBlockData(data).size() == 1) {
-                return getBlockDataTops(data).get(0);
+                return tops.get(0);
             }
 
-            return getVarianceGenerator(rng, data).fit(getBlockDataTops(data), z, y, x); //X and Z must be switched
+            return getVarianceGenerator(rng, data).fit(tops, z, y, x); //X and Z must be switched
         }
 
         return null;
@@ -228,6 +233,35 @@ public class IrisDecorator {
 
             return blockDataTops;
         });
+    }
+
+    /**
+     * Resolved whitelist palette, cached. Returns an empty list when no
+     * whitelist is configured; callers keep the null-has-whitelist gate.
+     */
+    public KList<BlockData> getWhitelistBlockData(IrisData data) {
+        return whitelistBlockData.aquire(() -> resolveBlockData(whitelist, data));
+    }
+
+    /**
+     * Resolved blacklist palette, cached. Returns an empty list when no
+     * blacklist is configured; callers keep the null-has-blacklist gate.
+     */
+    public KList<BlockData> getBlacklistBlockData(IrisData data) {
+        return blacklistBlockData.aquire(() -> resolveBlockData(blacklist, data));
+    }
+
+    private static KList<BlockData> resolveBlockData(KList<IrisBlockData> source, IrisData data) {
+        KList<BlockData> blocks = new KList<>();
+        if (source != null) {
+            for (IrisBlockData i : source) {
+                BlockData bx = i.getBlockData(data);
+                if (bx != null) {
+                    blocks.add(bx);
+                }
+            }
+        }
+        return blocks;
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")

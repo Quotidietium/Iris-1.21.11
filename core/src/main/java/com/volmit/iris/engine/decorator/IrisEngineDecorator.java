@@ -19,6 +19,7 @@
 package com.volmit.iris.engine.decorator;
 
 import com.volmit.iris.Iris;
+import com.volmit.iris.core.loader.IrisData;
 import com.volmit.iris.engine.framework.Engine;
 import com.volmit.iris.engine.framework.EngineAssignedComponent;
 import com.volmit.iris.engine.framework.EngineDecorator;
@@ -41,6 +42,11 @@ public abstract class IrisEngineDecorator extends EngineAssignedComponent implem
     private final IrisDecorationPart part;
     private final long seed;
     private final long modX, modZ;
+    // Shared by every getDecorator call: it is only consumed through
+    // nextParallelRNG, which derives from the immutable constructor seed and
+    // never mutates Random state, so sharing is bit-identical to the old
+    // per-call `new RNG(seed)`.
+    private final RNG pickerSeedRNG;
 
     public IrisEngineDecorator(Engine engine, String name, IrisDecorationPart part) {
         super(engine, name + " Decorator");
@@ -48,6 +54,7 @@ public abstract class IrisEngineDecorator extends EngineAssignedComponent implem
         this.seed = getSeed() + 29356788 - (part.ordinal() * 10439677L);
         this.modX = 29356788 ^ (part.ordinal() + 6);
         this.modZ = 10439677 ^ (part.ordinal() + 1);
+        this.pickerSeedRNG = new RNG(seed);
     }
 
     @BlockCoordinates
@@ -56,13 +63,19 @@ public abstract class IrisEngineDecorator extends EngineAssignedComponent implem
     }
 
     protected IrisDecorator getDecorator(RNG rng, IrisBiome biome, double realX, double realZ) {
-        KList<IrisDecorator> v = new KList<>();
+        KList<IrisDecorator> candidates = biome.getDecorators(part);
 
-        RNG gRNG = new RNG(seed);
-        for (IrisDecorator i : biome.getDecorators()) {
+        if (candidates.isEmpty()) {
+            return null;
+        }
+
+        int hits = 0;
+        IrisDecorator[] picked = new IrisDecorator[candidates.size()];
+        IrisData data = getData();
+        for (IrisDecorator i : candidates) {
             try {
-                if (i.getPartOf().equals(part) && i.getBlockData(biome, gRNG, realX, realZ, getData()) != null) {
-                    v.add(i);
+                if (i.getBlockData(biome, pickerSeedRNG, realX, realZ, data) != null) {
+                    picked[hits++] = i;
                 }
             } catch (Throwable e) {
                 Iris.reportError(e);
@@ -70,11 +83,7 @@ public abstract class IrisEngineDecorator extends EngineAssignedComponent implem
             }
         }
 
-        if (v.isNotEmpty()) {
-            return v.get(rng.nextInt(v.size()));
-        }
-
-        return null;
+        return hits == 0 ? null : picked[rng.nextInt(hits)];
     }
 
     protected BlockData fixFaces(BlockData b, Hunk<BlockData> hunk, int rX, int rZ, int x, int y, int z) {

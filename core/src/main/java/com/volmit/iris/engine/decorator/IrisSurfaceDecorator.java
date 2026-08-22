@@ -42,7 +42,8 @@ public class IrisSurfaceDecorator extends IrisEngineDecorator {
     @BlockCoordinates
     @Override
     public void decorate(int x, int z, int realX, int realX1, int realX_1, int realZ, int realZ1, int realZ_1, Hunk<BlockData> data, IrisBiome biome, int height, int max) {
-        if (biome.getInferredType().equals(InferredType.SHORE) && height < getDimension().getFluidHeight()) {
+        int fluidHeight = getDimension().getFluidHeight();
+        if (biome.getInferredType().equals(InferredType.SHORE) && height < fluidHeight) {
             return;
         }
 
@@ -50,7 +51,7 @@ public class IrisSurfaceDecorator extends IrisEngineDecorator {
         RNG rng = getRNG(realX, realZ);
         IrisDecorator decorator = getDecorator(rng, biome, realX, realZ);
         bdx = data.get(x, height, z);
-        boolean underwater = height < getDimension().getFluidHeight();
+        boolean underwater = height < fluidHeight;
 
         if (decorator != null) {
             if (!decorator.isForcePlace() && !decorator.getSlopeCondition().isDefault()
@@ -70,11 +71,24 @@ public class IrisSurfaceDecorator extends IrisEngineDecorator {
                 if (decorator.getForceBlock() != null) {
                     data.set(x, height, z, fixFaces(decorator.getForceBlock().getBlockData(getData()), data, x, z, realX, height, realZ));
                 } else if (!decorator.isForcePlace()) {
-                    if (decorator.getWhitelist() != null && decorator.getWhitelist().stream().noneMatch(d -> d.getBlockData(getData()).equals(bdx))) {
-                        return;
+                    if (decorator.getWhitelist() != null) {
+                        boolean whitelisted = false;
+                        for (BlockData d : decorator.getWhitelistBlockData(getData())) {
+                            if (d.equals(bdx)) {
+                                whitelisted = true;
+                                break;
+                            }
+                        }
+                        if (!whitelisted) {
+                            return;
+                        }
                     }
-                    if (decorator.getBlacklist() != null && decorator.getBlacklist().stream().anyMatch(d -> d.getBlockData(getData()).equals(bdx))) {
-                        return;
+                    if (decorator.getBlacklist() != null) {
+                        for (BlockData d : decorator.getBlacklistBlockData(getData())) {
+                            if (d.equals(bdx)) {
+                                return;
+                            }
+                        }
                     }
                 }
 
@@ -94,8 +108,8 @@ public class IrisSurfaceDecorator extends IrisEngineDecorator {
                     data.set(x, height + 1, z, fixFaces(bd, data, x, z, realX, height + 1, realZ));
                 }
             } else {
-                if (height < getDimension().getFluidHeight()) {
-                    max = getDimension().getFluidHeight();
+                if (height < fluidHeight) {
+                    max = fluidHeight;
                 }
 
                 int stack = decorator.getHeight(rng, realX, realZ, getData());
@@ -126,7 +140,7 @@ public class IrisSurfaceDecorator extends IrisEngineDecorator {
                         break;
                     }
 
-                    if (underwater && height + 1 + i > getDimension().getFluidHeight()) {
+                    if (underwater && height + 1 + i > fluidHeight) {
                         break;
                     }
 
