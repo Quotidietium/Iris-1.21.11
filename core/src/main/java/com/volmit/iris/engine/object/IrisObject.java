@@ -946,10 +946,12 @@ public class IrisObject extends IrisRegistrant {
                     d = AIR;
                 }
 
-                BlockVector i = g.clone();
+                // rotate/translate never mutate their argument and either
+                // return a fresh vector or the argument itself; i is only read
+                // below, so the previous 5-deep defensive clone chain is gone.
+                BlockVector i = config.getRotation().rotate(g, spinx, spiny, spinz);
                 BlockData data = d.clone();
-                i = config.getRotation().rotate(i.clone(), spinx, spiny, spinz).clone();
-                i = config.getTranslate().translate(i.clone(), config.getRotation(), spinx, spiny, spinz).clone();
+                i = config.getTranslate().translate(i, config.getRotation(), spinx, spiny, spinz);
 
                 if (stilting && i.getBlockY() < lowest && !B.isAir(data)) {
                     lowest = i.getBlockY();
@@ -1033,7 +1035,7 @@ public class IrisObject extends IrisRegistrant {
                     placer.getEngine().getMantle().getMantle().set(xx, yy, zz, new MatterMarker(markers.get(g)));
                 }
 
-                boolean wouldReplace = B.isSolid(placer.get(xx, yy, zz)) && B.isVineBlock(data);
+                boolean wouldReplace = B.isVineBlock(data) && B.isSolid(placer.get(xx, yy, zz));
                 boolean place = !data.getMaterial().equals(Material.AIR) && !data.getMaterial().equals(Material.CAVE_AIR) && !wouldReplace;
 
                 if (data instanceof IrisCustomData || place) {
@@ -1072,9 +1074,9 @@ public class IrisObject extends IrisRegistrant {
                     d = config.getStiltSettings().getPalette().get(rng, x, y, z, rdata);
 
 
-                BlockVector i = g.clone();
-                i = config.getRotation().rotate(i.clone(), spinx, spiny, spinz).clone();
-                i = config.getTranslate().translate(i.clone(), config.getRotation(), spinx, spiny, spinz).clone();
+                // Same clone-chain reduction as the main loop (read-only use).
+                BlockVector i = config.getRotation().rotate(g, spinx, spiny, spinz);
+                i = config.getTranslate().translate(i, config.getRotation(), spinx, spiny, spinz);
                 d = config.getRotation().rotate(d, spinx, spiny, spinz);
 
                 if (i.getBlockY() != lowest)
