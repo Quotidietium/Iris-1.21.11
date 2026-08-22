@@ -85,15 +85,26 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
         int ceilrad = (int) Math.ceil(radius);
         double r2 = Math.pow(radius, 2);
 
+        // Squared integer offsets memoized once per call: the lattice below hits
+        // each cell with three Math.pow invocations otherwise (plus a varargs
+        // double[] per hypot call). The partial-sum order matches the old
+        // varargs hypot exactly: (dx*dx + dy*dy) + dz*dz.
+        final double[] sq = new double[(ceilrad << 1) + 1];
+        for (int i = 0; i < sq.length; i++) {
+            sq[i] = Math.pow(i - ceilrad, 2);
+        }
+
         for (IrisPosition v : vset) {
             int tipx = v.getX();
             int tipy = v.getY();
             int tipz = v.getZ();
 
             for (int loopx = tipx - ceilrad; loopx <= tipx + ceilrad; loopx++) {
+                double xy = sq[loopx - tipx + ceilrad];
                 for (int loopy = tipy - ceilrad; loopy <= tipy + ceilrad; loopy++) {
+                    double xz = xy + sq[loopy - tipy + ceilrad];
                     for (int loopz = tipz - ceilrad; loopz <= tipz + ceilrad; loopz++) {
-                        if (hypot(loopx - tipx, loopy - tipy, loopz - tipz) <= r2) {
+                        if (xz + sq[loopz - tipz + ceilrad] <= r2) {
                             returnset.add(new IrisPosition(loopx, loopy, loopz));
                         }
                     }
@@ -119,14 +130,6 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
             }
         }
         return returnset;
-    }
-
-    private static double hypot(double... pars) {
-        double sum = 0;
-        for (double d : pars) {
-            sum += Math.pow(d, 2);
-        }
-        return sum;
     }
 
     private static double lengthSq(double x, double y, double z) {
@@ -447,11 +450,11 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
      * @param <T>  the type of data to apply to the mantle
      */
     public <T> void setCuboid(int x1, int y1, int z1, int x2, int y2, int z2, T data) {
-        int j, k;
-
+        // The inner loops used to iterate x1..x2 on all three axes, ignoring the
+        // y/z bounds entirely (upstream bug; no in-tree caller was affected).
         for (int i = x1; i <= x2; i++) {
-            for (j = x1; j <= x2; j++) {
-                for (k = x1; k <= x2; k++) {
+            for (int j = y1; j <= y2; j++) {
+                for (int k = z1; k <= z2; k++) {
                     setData(i, j, k, data);
                 }
             }
@@ -552,15 +555,24 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
         int ceil = (int) Math.ceil(radius);
         double r2 = Math.pow(radius, 2);
 
+        // Same memoized-squares structure as getBallooned (see note there);
+        // the old varargs hypot summed (x*x + y*y) + z*z.
+        final double[] sq = new double[(ceil << 1) + 1];
+        for (int i = 0; i < sq.length; i++) {
+            sq[i] = Math.pow(i - ceil, 2);
+        }
+
         for (IrisPosition v : vectors) {
             int tipX = v.getX();
             int tipY = v.getY();
             int tipZ = v.getZ();
 
             for (int x = -ceil; x <= ceil; x++) {
+                double xy = sq[x + ceil];
                 for (int y = -ceil; y <= ceil; y++) {
+                    double xz = xy + sq[y + ceil];
                     for (int z = -ceil; z <= ceil; z++) {
-                        if (hypot(x, y, z) > r2 || !masks.contains(new IrisPosition(x, y, z)))
+                        if (xz + sq[z + ceil] > r2 || !masks.contains(new IrisPosition(x, y, z)))
                             continue;
                         vset.add(new IrisPosition(tipX + x, tipY + y, tipZ + z));
                     }
