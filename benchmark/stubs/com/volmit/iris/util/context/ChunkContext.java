@@ -12,6 +12,7 @@ public class ChunkContext {
     private final int x;
     private final int z;
     private ChunkedDataCache<Double> height;
+    private ChunkedDataCache<BlockData> fluid;
 
     public ChunkContext(int x, int z, Object complex) {
         this(x, z, complex, true);
@@ -25,6 +26,12 @@ public class ChunkContext {
     /** Bench hook: attach a pre-filled height cache so getHeight().get answers offline. */
     public ChunkContext height(ChunkedDataCache<Double> height) {
         this.height = height;
+        return this;
+    }
+
+    /** Bench hook: attach a pre-filled fluid cache so getFluid().get answers offline. */
+    public ChunkContext fluid(ChunkedDataCache<BlockData> fluid) {
+        this.fluid = fluid;
         return this;
     }
 
@@ -56,6 +63,9 @@ public class ChunkContext {
     }
 
     public ChunkedDataCache<BlockData> getFluid() {
+        if (fluid != null) {
+            return fluid;
+        }
         throw new UnsupportedOperationException("stub");
     }
 

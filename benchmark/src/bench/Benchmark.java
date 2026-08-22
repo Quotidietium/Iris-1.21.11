@@ -1104,6 +1104,326 @@ public final class Benchmark {
                 });
             }
 
+            // ---- Cave carve write path (IrisCave.generate -> worm -> MantleWriter.setNoiseMasked) ----
+            // Real IrisCave against a real Mantle + MantleWriter (Engine and
+            // EngineMantle are JDK proxies returning those real objects). The
+            // worm walks 3 per-axis CNG streams, then every point is ballooned
+            // over a (2*ceil(girth)+1)^3 lattice, noise-masked and written as
+            // MatterCavern cells — the dominant underground carve cost. Digest =
+            // the full MatterCavern slice state per op (position + cavern flag +
+            // customBiome hash + liquid): between ops each chunk in the writer
+            // bounds is iterated (folded) and its cavern slice deleted, so every
+            // op's entire carve output lands in the digest while the mantle
+            // stays constant-size.
+            {
+                final com.volmit.iris.engine.framework.Engine caveEngine;
+                final com.volmit.iris.engine.mantle.EngineMantle caveEngineMantle;
+                final com.volmit.iris.util.mantle.Mantle caveMantle;
+                {
+                    java.util.Map<String, Object> hard = new java.util.HashMap<>();
+                    hard.put("getCacheID", 975313);
+                    hard.put("getSeedManager",
+                            new com.volmit.iris.engine.framework.SeedManager(13579113L));
+                    hard.put("getData", com.volmit.iris.core.loader.IrisData.get(
+                            new java.io.File("benchmark/results/_decodata")));
+                    hard.put("getDimension", new com.volmit.iris.engine.object.IrisDimension()
+                            .setName("bench-dim").setFluidHeight(62));
+                    hard.put("getHeight", 256);
+                    hard.put("getMinHeight", 0);
+                    java.lang.reflect.InvocationHandler h = (proxy, method, args) -> {
+                        Object v = hard.get(method.getName());
+                        if (v != null) {
+                            return v;
+                        }
+                        Class<?> rt = method.getReturnType();
+                        if (rt == boolean.class) return false;
+                        if (rt == long.class) return 0L;
+                        if (rt == int.class) return 0;
+                        if (rt == double.class) return 0D;
+                        if (rt == float.class) return 0F;
+                        if (rt == short.class) return (short) 0;
+                        if (rt == byte.class) return (byte) 0;
+                        if (rt == char.class) return (char) 0;
+                        return null;
+                    };
+                    caveEngine = (com.volmit.iris.engine.framework.Engine)
+                            java.lang.reflect.Proxy.newProxyInstance(
+                                    Benchmark.class.getClassLoader(),
+                                    new Class[]{com.volmit.iris.engine.framework.Engine.class}, h);
+                    caveMantle = new com.volmit.iris.util.mantle.Mantle(
+                            new java.io.File("benchmark/results/_cavemantle"), 256);
+                    java.util.Map<String, Object> em = new java.util.HashMap<>();
+                    em.put("getMantle", caveMantle);
+                    caveEngineMantle = (com.volmit.iris.engine.mantle.EngineMantle)
+                            java.lang.reflect.Proxy.newProxyInstance(
+                                    Benchmark.class.getClassLoader(),
+                                    new Class[]{com.volmit.iris.engine.mantle.EngineMantle.class},
+                                    (proxy, method, args) -> {
+                                        Object v = em.get(method.getName());
+                                        if (v != null) {
+                                            return v;
+                                        }
+                                        Class<?> rt = method.getReturnType();
+                                        if (rt == boolean.class) return false;
+                                        if (rt == long.class) return 0L;
+                                        if (rt == int.class) return 0;
+                                        if (rt == double.class) return 0D;
+                                        if (rt == float.class) return 0F;
+                                        if (rt == short.class) return (short) 0;
+                                        if (rt == byte.class) return (byte) 0;
+                                        if (rt == char.class) return (char) 0;
+                                        return null;
+                                    });
+                }
+
+                final com.volmit.iris.engine.object.IrisCave cave =
+                        new com.volmit.iris.engine.object.IrisCave()
+                                .setWorm(new com.volmit.iris.engine.object.IrisWorm()
+                                        .setMaxDistance(96).setMaxIterations(128));
+                // Writer bounds: radius 3 -> chunks [-6, 6] centered on (0, 0);
+                // worm heads stay inside isWithin bounds and balloons extend at
+                // most girth+0.5 blocks past them, so every setData is in-bounds.
+                final int WR = 6;
+
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "cave-carve";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 120;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        Random r = new Random(seed);
+                        double bh = 0;
+                        for (int i = 0; i < n; i++) {
+                            reset(dg);
+                            com.volmit.iris.engine.mantle.MantleWriter w =
+                                    caveMantle.write(caveEngineMantle, 0, 0, 3, false);
+                            RNG rng = new RNG(seed * 131L + i);
+                            int x = r.nextInt(40) - 20;
+                            int z = r.nextInt(40) - 20;
+                            int y = 24 + r.nextInt(40);
+                            cave.generate(w, rng, caveEngine, x, y, z);
+                            w.close();
+                            bh += x + y + z;
+                        }
+                        reset(dg);
+                        return bh;
+                    }
+
+                    /** Fold + clear every chunk's cavern cells inside the writer bounds. */
+                    private void reset(Digest dg) {
+                        for (int cx = -WR; cx <= WR; cx++) {
+                            for (int cz = -WR; cz <= WR; cz++) {
+                                com.volmit.iris.util.mantle.MantleChunk c = caveMantle.getChunk(cx, cz);
+                                c.iterate(com.volmit.iris.util.matter.MatterCavern.class,
+                                        (x, y, z, v) -> {
+                                            dg.add(x);
+                                            dg.add(y);
+                                            dg.add(z);
+                                            dg.add(v.isCavern() ? 1 : 0);
+                                            dg.add(v.getCustomBiome().hashCode());
+                                            dg.add(v.getLiquid());
+                                        });
+                                c.deleteSlices(com.volmit.iris.util.matter.MatterCavern.class);
+                            }
+                        }
+                    }
+                });
+            }
+
+            // ---- Cave carve read path (IrisCarveModifier.onModify) ----
+            // Real modifier over a real Mantle chunk pre-filled with MatterCavern
+            // cells (a water pocket sphere + a dry tunnel, so the iterator pays
+            // the fluid-skip, water-fill, cave-air and multi-zone assembly
+            // branches). The 16x256x16 hunk is stone with air pockets and a
+            // decorant block at each zone cap so processZone's decorant-clearing
+            // writes fire; every hunk write folds into the digest via
+            // Hunk.listen. M.r()-gated mantle markers are deliberately NOT
+            // digested (Math.random() is unseedable); they do not touch the hunk.
+            {
+                final com.volmit.iris.engine.framework.Engine carveEngine;
+                final com.volmit.iris.util.mantle.Mantle carveMantle;
+                {
+                    carveMantle = new com.volmit.iris.util.mantle.Mantle(
+                            new java.io.File("benchmark/results/_carvemantle"), 256);
+                    java.util.Map<String, Object> em = new java.util.HashMap<>();
+                    em.put("getMantle", carveMantle);
+                    final com.volmit.iris.engine.mantle.EngineMantle carveEngineMantle =
+                            (com.volmit.iris.engine.mantle.EngineMantle)
+                                    java.lang.reflect.Proxy.newProxyInstance(
+                                            Benchmark.class.getClassLoader(),
+                                            new Class[]{com.volmit.iris.engine.mantle.EngineMantle.class},
+                                            (proxy, method, args) -> {
+                                                Object v = em.get(method.getName());
+                                                if (v != null) {
+                                                    return v;
+                                                }
+                                                Class<?> rt = method.getReturnType();
+                                                if (rt == boolean.class) return false;
+                                                if (rt == long.class) return 0L;
+                                                if (rt == int.class) return 0;
+                                                if (rt == double.class) return 0D;
+                                                if (rt == float.class) return 0F;
+                                                if (rt == short.class) return (short) 0;
+                                                if (rt == byte.class) return (byte) 0;
+                                                if (rt == char.class) return (char) 0;
+                                                return null;
+                                            });
+                    java.util.Map<String, Object> hard = new java.util.HashMap<>();
+                    hard.put("getCacheID", 486217);
+                    hard.put("getSeedManager",
+                            new com.volmit.iris.engine.framework.SeedManager(246810L));
+                    hard.put("getData", com.volmit.iris.core.loader.IrisData.get(
+                            new java.io.File("benchmark/results/_decodata")));
+                    hard.put("getDimension", new com.volmit.iris.engine.object.IrisDimension()
+                            .setName("bench-dim").setFluidHeight(62).setCaveLavaHeight(-8));
+                    hard.put("getHeight", 256);
+                    hard.put("getMinHeight", 0);
+                    hard.put("getWorld", com.volmit.iris.engine.object.IrisWorld.builder()
+                            .minHeight(0).maxHeight(256).build());
+                    hard.put("getMetrics", new com.volmit.iris.engine.framework.EngineMetrics(10));
+                    hard.put("getMantle", carveEngineMantle);
+                    java.lang.reflect.InvocationHandler h = (proxy, method, args) -> {
+                        Object v = hard.get(method.getName());
+                        if (v != null) {
+                            return v;
+                        }
+                        Class<?> rt = method.getReturnType();
+                        if (rt == boolean.class) return false;
+                        if (rt == long.class) return 0L;
+                        if (rt == int.class) return 0;
+                        if (rt == double.class) return 0D;
+                        if (rt == float.class) return 0F;
+                        if (rt == short.class) return (short) 0;
+                        if (rt == byte.class) return (byte) 0;
+                        if (rt == char.class) return (char) 0;
+                        return null;
+                    };
+                    carveEngine = (com.volmit.iris.engine.framework.Engine)
+                            java.lang.reflect.Proxy.newProxyInstance(
+                                    Benchmark.class.getClassLoader(),
+                                    new Class[]{com.volmit.iris.engine.framework.Engine.class}, h);
+                }
+
+                // Prefill cavern cells: water sphere (y 34..46) + dry tunnel (y 60..66)
+                for (int dx = -6; dx <= 6; dx++) {
+                    for (int dy = -6; dy <= 6; dy++) {
+                        for (int dz = -6; dz <= 6; dz++) {
+                            if (dx * dx + dy * dy + dz * dz > 36) {
+                                continue;
+                            }
+                            int x = 8 + dx, y = 40 + dy, z = 8 + dz;
+                            if (x < 0 || x > 15 || z < 0 || z > 15 || y < 1 || y > 250) {
+                                continue;
+                            }
+                            carveMantle.set(x, y, z, com.volmit.iris.util.matter.slices.CavernMatter.get(
+                                    "", y < 38 ? 1 : 0));
+                        }
+                    }
+                }
+                for (int x = 7; x <= 9; x++) {
+                    for (int y = 60; y <= 66; y++) {
+                        for (int z = 7; z <= 9; z++) {
+                            carveMantle.set(x, y, z,
+                                    com.volmit.iris.util.matter.slices.CavernMatter.get("", 0));
+                        }
+                    }
+                }
+
+                final com.volmit.iris.engine.modifier.IrisCarveModifier carveModifier =
+                        new com.volmit.iris.engine.modifier.IrisCarveModifier(carveEngine);
+
+                final BlockData stone = Material.STONE.createBlockData();
+                final BlockData shortGrass = Material.GRASS.createBlockData();
+                final BlockData water = Material.WATER.createBlockData();
+                final BlockData caveAir = Material.CAVE_AIR.createBlockData();
+                final Double[] carveHeights = new Double[256];
+                final BlockData[] carveFluid = new BlockData[256];
+                for (int i = 0; i < 256; i++) {
+                    carveHeights[i] = 100.0;
+                    carveFluid[i] = water;
+                }
+                final com.volmit.iris.util.context.ChunkContext carveCtx =
+                        new com.volmit.iris.util.context.ChunkContext(0, 0, null)
+                                .height(new com.volmit.iris.util.context.ChunkedDataCache<Double>(null, 0, 0)
+                                        .prefill(carveHeights))
+                                .fluid(new com.volmit.iris.util.context.ChunkedDataCache<BlockData>(null, 0, 0)
+                                        .prefill(carveFluid));
+
+                final Hunk<BlockData> carveBase = Hunk.newArrayHunk(16, 80, 16);
+                final Digest[] carveDigest = new Digest[1];
+                final Hunk<BlockData> carveHunk = carveBase.listen((x, y, z, t) -> {
+                    Digest d = carveDigest[0];
+                    d.add(x);
+                    d.add(y);
+                    d.add(z);
+                    d.add(t == null ? -1 : t.getMaterial().ordinal());
+                });
+
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "carve-modify";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 4_000;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        carveDigest[0] = dg;
+                        double bh = 0;
+                        for (int i = 0; i < n; i++) {
+                            // Reset: solid stone everywhere, then sculpt the sphere
+                            // cells into four hunk bands so every iterator branch
+                            // fires: y 34-35 cave air (isAir early return),
+                            // y 36-37 stone at water-cavern cells (fluid fill),
+                            // y 38-40 water (isFluid skip), y 41-46 stone at dry
+                            // cavern cells (cave-air write). The tunnel cells stay
+                            // stone (dry cavern write path). Decorant blocks sit
+                            // above each zone ceiling for processZone's clearing.
+                            for (int x = 0; x < 16; x++) {
+                                for (int y = 0; y < 80; y++) {
+                                    for (int z = 0; z < 16; z++) {
+                                        carveBase.set(x, y, z, stone);
+                                    }
+                                }
+                            }
+                            for (int dy = -6; dy <= 6; dy++) {
+                                for (int dx = -6; dx <= 6; dx++) {
+                                    for (int dz = -6; dz <= 6; dz++) {
+                                        if (dx * dx + dy * dy + dz * dz > 36) {
+                                            continue;
+                                        }
+                                        int x = 8 + dx, y = 40 + dy, z = 8 + dz;
+                                        if (x < 0 || x > 15 || z < 0 || z > 15 || y < 1) {
+                                            continue;
+                                        }
+                                        if (y <= 35 || (y >= 38 && y <= 40)) {
+                                            carveBase.set(x, y, z, y <= 35 ? caveAir : water);
+                                        }
+                                    }
+                                }
+                            }
+                            carveBase.set(8, 47, 8, shortGrass);
+                            carveBase.set(8, 67, 8, shortGrass);
+                            carveModifier.onModify(0, 0, carveHunk, false, carveCtx);
+                            bh += i;
+                        }
+                        carveDigest[0] = null;
+                        return bh;
+                    }
+                });
+            }
+
             // HyperLock: hit-pattern lock/unlock through with(x, z, runnable)
             // (region keys repeat, like Mantle region locking in production).
             HyperLock hl = new HyperLock(1024);

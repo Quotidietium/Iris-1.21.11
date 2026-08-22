@@ -14,3 +14,5 @@ log4j-api-2.24.3.jar, log4j-core-2.24.3.jar, jspecify-1.0.0.jar,
 checker-qual-3.48.4.jar, byte-buddy-1.15.11.jar, byte-buddy-agent-1.15.11.jar,
 bstats-bukkit-3.0.2.jar, bstats-base-3.0.2.jar, oshi-core-6.6.5.jar,
 jna-5.15.0.jar, jna-platform-5.15.0.jar
+
+kotlin-stdlib-2.0.21.jar (runtime dep of MultiBurst via kotlinx-coroutines; fetched from Maven Central)
