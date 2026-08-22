@@ -59,14 +59,26 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
         PrecisionStopwatch p = PrecisionStopwatch.start();
         Mantle mantle = getEngine().getMantle().getMantle();
         MantleChunk mc = mantle.getChunk(x, z).use();
-        KMap<Long, KList<Integer>> positions = new KMap<>();
         KMap<IrisPosition, MatterCavern> walls = new KMap<>();
+        // Per-column cave Ys accumulate into a fixed 256-slot array (rx*16+rz),
+        // avoiding a boxed-Long KMap lookup per block. firstTouch records the
+        // columns in first-encounter order so the KMap below gets its entries
+        // inserted in exactly the order the old computeIfAbsent chain would
+        // have — identical key set + insertion order means an identical hash
+        // table, so zone processing order (and the M.r draws inside it) is
+        // bit-for-bit the same as before.
+        int[][] columnYs = new int[256][];
+        int[] columnCount = new int[256];
+        int[] firstTouch = new int[256];
+        final int[] touched = new int[1];
+        // Loop-invariant bounds (world config cannot change mid-chunk).
+        final int worldTop = getEngine().getWorld().maxHeight() - getEngine().getWorld().minHeight();
         Consumer4<Integer, Integer, Integer, MatterCavern> iterator = (xx, yy, zz, c) -> {
             if (c == null) {
                 return;
             }
 
-            if (yy >= getEngine().getWorld().maxHeight() - getEngine().getWorld().minHeight() || yy <= 0) { // Yes, skip bedrock
+            if (yy >= worldTop || yy <= 0) { // Yes, skip bedrock
                 return;
             }
 
@@ -79,7 +91,19 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
                 return;
             }
 
-            positions.computeIfAbsent(Cache.key(rx, rz), (k) -> new KList<>()).qadd(yy);
+            int ci = (rx << 4) | rz;
+            int[] ys = columnYs[ci];
+            if (ys == null) {
+                ys = new int[8];
+                columnYs[ci] = ys;
+                firstTouch[touched[0]++] = ci;
+            } else if (columnCount[ci] == ys.length) {
+                int[] grown = new int[ys.length << 1];
+                System.arraycopy(ys, 0, grown, 0, ys.length);
+                columnYs[ci] = grown;
+                ys = grown;
+            }
+            ys[columnCount[ci]++] = yy;
 
             //todo: Fix chunk decoration not working on chunk's border
 
@@ -118,6 +142,13 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
 
         mc.iterate(MatterCavern.class, iterator);
 
+        KMap<Long, int[]> positions = new KMap<>();
+        for (int i = 0; i < touched[0]; i++) {
+            int ci = firstTouch[i];
+            positions.put(Cache.key(ci >> 4, ci & 15),
+                    java.util.Arrays.copyOf(columnYs[ci], columnCount[ci]));
+        }
+
         walls.forEach((i, v) -> {
             IrisBiome biome = v.getCustomBiome().isEmpty()
                     ? getEngine().getCaveBiome(i.getX() + (x << 4), i.getZ() + (z << 4))
@@ -133,20 +164,21 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
             }
         });
 
+        final int engineHeight = getEngine().getHeight();
         positions.forEach((k, v) -> {
-            if (v.isEmpty()) {
+            if (v.length == 0) {
                 return;
             }
 
             int rx = Cache.keyX(k);
             int rz = Cache.keyZ(k);
-            v.sort(Integer::compare);
+            java.util.Arrays.sort(v);
             CaveZone zone = new CaveZone();
-            zone.setFloor(v.get(0));
-            int buf = v.get(0) - 1;
+            zone.setFloor(v[0]);
+            int buf = v[0] - 1;
 
-            for (Integer i : v) {
-                if (i < 0 || i > getEngine().getHeight()) {
+            for (int i : v) {
+                if (i < 0 || i > engineHeight) {
                     continue;
                 }
 
