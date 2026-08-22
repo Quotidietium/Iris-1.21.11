@@ -233,7 +233,7 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
                 continue;
             }
 
-            output.set(rx, y, rz, blocks.get(i));
+            output.set(rx, y, rz, b);
         }
 
         blocks = biome.generateCeilingLayers(getDimension(), xx, zz, rng, 3, zone.ceiling, getData(), getComplex());

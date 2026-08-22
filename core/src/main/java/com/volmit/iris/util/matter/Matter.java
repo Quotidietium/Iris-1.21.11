@@ -91,9 +91,10 @@ public interface Matter {
             min.setZ(Math.min(min.getZ(), i.getZ()));
         }
 
-        for (BlockVector i : object.getBlocks().keys()) {
-            m.slice(BlockData.class).set(i.getBlockX() - min.getBlockX(), i.getBlockY() - min.getBlockY(), i.getBlockZ() - min.getBlockZ(), object.getBlocks().get(i));
-        }
+        // Write phase uses the finalized min; entry iteration avoids the
+        // keys()+get(i) double lookup (two boxed keys per block).
+        object.getBlocks().forEach((i, block) ->
+                m.slice(BlockData.class).set(i.getBlockX() - min.getBlockX(), i.getBlockY() - min.getBlockY(), i.getBlockZ() - min.getBlockZ(), block));
 
         return m;
     }
