@@ -51,6 +51,14 @@ public class IrisBiomeGeneratorLink {
     private int max = 0;
 
     public IrisGenerator getCachedGenerator(DataProvider g) {
+        // Hit path via peek(): the capturing supplier below is allocated at
+        // this call site on EVERY invocation otherwise, and getHeight() runs
+        // per height sample (the hottest stream in the engine).
+        IrisGenerator cached = gen.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return gen.aquire(() -> {
             IrisGenerator gen = g.getData().getGeneratorLoader().load(getGenerator());
 

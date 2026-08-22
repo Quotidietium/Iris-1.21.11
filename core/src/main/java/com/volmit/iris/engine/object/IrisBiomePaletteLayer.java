@@ -65,6 +65,11 @@ public class IrisBiomePaletteLayer {
     private KList<IrisBlockData> palette = new KList<IrisBlockData>().qadd(new IrisBlockData("GRASS_BLOCK"));
 
     public CNG getHeightGenerator(RNG rng, IrisData data) {
+        CNG cached = heightGenerator.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return heightGenerator.aquire(() -> CNG.signature(rng.nextParallelRNG(minHeight * maxHeight + getBlockData(data).size())));
     }
 
@@ -81,6 +86,11 @@ public class IrisBiomePaletteLayer {
     }
 
     public CNG getLayerGenerator(RNG rng, IrisData data) {
+        CNG cached = layerGenerator.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return layerGenerator.aquire(() ->
         {
             RNG rngx = rng.nextParallelRNG(minHeight + maxHeight + getBlockData(data).size());
@@ -95,6 +105,13 @@ public class IrisBiomePaletteLayer {
     }
 
     public KList<BlockData> getBlockData(IrisData data) {
+        // Hot hit path: called per palette lookup (per layer block), and the
+        // capturing supplier below would be allocated on every call.
+        KList<BlockData> cached = blockData.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return blockData.aquire(() ->
         {
             KList<BlockData> blockData = new KList<>();

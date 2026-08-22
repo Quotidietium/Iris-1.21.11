@@ -257,7 +257,9 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     }
 
     public double getGenLinkMax(String loadKey, Engine engine) {
-        Integer v = genCacheMax.aquire(() ->
+        KMap<String, Integer> cMax = genCacheMax.peek();
+        Integer v = cMax != null ? cMax.get(loadKey)
+                : genCacheMax.aquire(() ->
         {
             KMap<String, Integer> l = new KMap<>();
 
@@ -273,7 +275,9 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     }
 
     public double getGenLinkMin(String loadKey, Engine engine) {
-        Integer v = genCacheMin.aquire(() ->
+        KMap<String, Integer> cMin = genCacheMin.peek();
+        Integer v = cMin != null ? cMin.get(loadKey)
+                : genCacheMin.aquire(() ->
         {
             KMap<String, Integer> l = new KMap<>();
 
@@ -288,7 +292,8 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     }
 
     public IrisBiomeGeneratorLink getGenLink(String loadKey) {
-        return genCache.aquire(() ->
+        KMap<String, IrisBiomeGeneratorLink> c = genCache.peek();
+        return (c != null ? c : genCache.aquire(() ->
         {
             KMap<String, IrisBiomeGeneratorLink> l = new KMap<>();
 
@@ -297,10 +302,15 @@ public class IrisBiome extends IrisRegistrant implements IRare {
             }
 
             return l;
-        }).get(loadKey);
+        })).get(loadKey);
     }
 
     public IrisBiome getRealCarvingBiome(IrisData data) {
+        IrisBiome cached = realCarveBiome.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return realCarveBiome.aquire(() ->
         {
             IrisBiome biome = data.getBiomeLoader().load(getCarvingBiome());
@@ -314,6 +324,11 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     }
 
     public KList<IrisObjectPlacement> getSurfaceObjects() {
+        KList<IrisObjectPlacement> surface = getSurfaceObjectsCache().peek();
+        if (surface != null) {
+            return surface;
+        }
+
         return getSurfaceObjectsCache().aquire(() ->
         {
             KList<IrisObjectPlacement> o = getObjects().copy();
@@ -329,6 +344,11 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     }
 
     public KList<IrisObjectPlacement> getCarvingObjects() {
+        KList<IrisObjectPlacement> carving = getCarveObjectsCache().peek();
+        if (carving != null) {
+            return carving;
+        }
+
         return getCarveObjectsCache().aquire(() ->
         {
             KList<IrisObjectPlacement> o = getObjects().copy();
@@ -354,11 +374,21 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     }
 
     public CNG getBiomeGenerator(RNG random) {
+        CNG bg = biomeGenerator.peek();
+        if (bg != null) {
+            return bg;
+        }
+
         return biomeGenerator.aquire(() ->
                 biomeStyle.create(random.nextParallelRNG(213949 + 228888 + getRarity() + getName().length()), getLoader()));
     }
 
     public CNG getChildrenGenerator(RNG random, int sig, double scale) {
+        CNG cc = childrenCell.peek();
+        if (cc != null) {
+            return cc;
+        }
+
         return childrenCell.aquire(() -> getChildStyle().create(random.nextParallelRNG(sig * 2137), getLoader()).bake().scale(scale).bake());
     }
 
@@ -373,8 +403,9 @@ public class IrisBiome extends IrisRegistrant implements IRare {
             return data;
         }
 
+        KList<CNG> hgens = getLayerHeightGenerators(random, rdata);
         for (int i = 0; i < layers.size(); i++) {
-            CNG hgen = getLayerHeightGenerators(random, rdata).get(i);
+            CNG hgen = hgens.get(i);
             double d = hgen.fit(layers.get(i).getMinHeight(), layers.get(i).getMaxHeight(), wx / layers.get(i).getZoom(), wz / layers.get(i).getZoom());
 
             IrisSlopeClip sc = getLayers().get(i).getSlopeCondition();
@@ -427,8 +458,9 @@ public class IrisBiome extends IrisRegistrant implements IRare {
             return data;
         }
 
+        KList<CNG> hgens = getLayerHeightGenerators(random, rdata);
         for (int i = 0; i < caveCeilingLayers.size(); i++) {
-            CNG hgen = getLayerHeightGenerators(random, rdata).get(i);
+            CNG hgen = hgens.get(i);
             double d = hgen.fit(caveCeilingLayers.get(i).getMinHeight(), caveCeilingLayers.get(i).getMaxHeight(), wx / caveCeilingLayers.get(i).getZoom(), wz / caveCeilingLayers.get(i).getZoom());
 
             if (d <= 0) {
@@ -474,8 +506,9 @@ public class IrisBiome extends IrisRegistrant implements IRare {
             return data;
         }
 
+        KList<CNG> hgens = getLayerHeightGenerators(random, rdata);
         for (int i = 0; i < layers.size(); i++) {
-            CNG hgen = getLayerHeightGenerators(random, rdata).get(i);
+            CNG hgen = hgens.get(i);
             double d = hgen.fit(layers.get(i).getMinHeight(), layers.get(i).getMaxHeight(), wx / layers.get(i).getZoom(), wz / layers.get(i).getZoom());
 
             IrisSlopeClip sc = getLayers().get(i).getSlopeCondition();
@@ -514,6 +547,11 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     }
 
     public int getMaxHeight(Engine engine) {
+        Integer mh = maxHeight.peek();
+        if (mh != null) {
+            return mh;
+        }
+
         return maxHeight.aquire(() ->
         {
             int maxHeight = 0;
@@ -527,6 +565,11 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     }
 
     public int getMaxWithObjectHeight(IrisData data, Engine engine) {
+        Integer mwoh = maxWithObjectHeight.peek();
+        if (mwoh != null) {
+            return mwoh;
+        }
+
         return maxWithObjectHeight.aquire(() ->
         {
             int maxHeight = 0;
@@ -550,8 +593,9 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     public KList<BlockData> generateSeaLayers(double wx, double wz, RNG random, int maxDepth, IrisData rdata) {
         KList<BlockData> data = new KList<>();
 
+        KList<CNG> hgens = getLayerSeaHeightGenerators(random, rdata);
         for (int i = 0; i < seaLayers.size(); i++) {
-            CNG hgen = getLayerSeaHeightGenerators(random, rdata).get(i);
+            CNG hgen = hgens.get(i);
             int d = hgen.fit(seaLayers.get(i).getMinHeight(), seaLayers.get(i).getMaxHeight(), wx / seaLayers.get(i).getZoom(), wz / seaLayers.get(i).getZoom());
 
             if (d < 0) {
@@ -580,6 +624,11 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     }
 
     public KList<CNG> getLayerHeightGenerators(RNG rng, IrisData rdata) {
+        KList<CNG> cached = layerHeightGenerators.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return layerHeightGenerators.aquire(() ->
         {
             KList<CNG> layerHeightGenerators = new KList<>();
@@ -595,6 +644,11 @@ public class IrisBiome extends IrisRegistrant implements IRare {
     }
 
     public KList<CNG> getLayerSeaHeightGenerators(RNG rng, IrisData data) {
+        KList<CNG> cached = layerSeaHeightGenerators.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return layerSeaHeightGenerators.aquire(() ->
         {
             KList<CNG> layerSeaHeightGenerators = new KList<>();

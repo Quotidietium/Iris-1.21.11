@@ -51,6 +51,17 @@ public class AtomicCache<T> {
         }
     }
 
+    /**
+     * Fast-path probe for hot callers: returns the cached value without having
+     * to construct the supplier (an aquire(capturing-lambda) call site
+     * allocates its lambda even on a cache hit). Returns null when the value
+     * has not been computed yet -- callers fall back to aquire(), which also
+     * settles the nullSupport distinction.
+     */
+    public T peek() {
+        return t.get();
+    }
+
     public T aquireNasty(NastySupplier<T> t) {
         return aquire(() -> {
             try {
