@@ -80,11 +80,15 @@ public class IrisCave extends IrisRegistrant {
         int highestWater = Math.max(waterHint, -1);
 
         if (highestWater == -1) {
+            // Both getters are loop-invariant here (x/z and the dimension are
+            // fixed for this cave), so hoist them out of the scan.
+            int th = engine.getHeight(x, z, true);
+            int fluidHeight = engine.getDimension().getFluidHeight();
+
             for (IrisPosition i : points) {
                 double yy = i.getY() + girth;
-                int th = engine.getHeight(x, z, true);
 
-                if (yy > th && th < engine.getDimension().getFluidHeight()) {
+                if (yy > th && th < fluidHeight) {
                     highestWater = Math.max(highestWater, (int) yy);
                     break;
                 }

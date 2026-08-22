@@ -103,13 +103,16 @@ public class IrisRavine extends IrisRegistrant {
         int highestWater = Math.max(waterHint, -1);
         boolean water = false;
 
+        // rsurface and th depend only on (x, z, y), which never change inside
+        // the loops below — hoisted so the height stream is queried once.
+        final int rsurface = y == -1 ? engine.getComplex().getHeightStream().get(x, z).intValue() : y;
+        final int th = engine.getHeight(x, z, true);
+
         if (highestWater == -1) {
             for (IrisPosition i : pos) {
-                int rsurface = y == -1 ? engine.getComplex().getHeightStream().get(x, z).intValue() : y;
                 int depth = (int) Math.round(dg.fitDouble(depthStyle.getMin(), depthStyle.getMax(), i.getX(), i.getZ()));
                 int surface = (int) Math.round(rsurface - depth * 0.45);
                 int yy = surface + depth;
-                int th = engine.getHeight(x, z, true);
 
                 if (yy > th && th < engine.getDimension().getFluidHeight()) {
                     highestWater = Math.max(highestWater, yy);
@@ -129,7 +132,6 @@ public class IrisRavine extends IrisRegistrant {
         }
 
         for (IrisPosition p : pos) {
-            int rsurface = y == -1 ? engine.getComplex().getHeightStream().get(x, z).intValue() : y;
             int depth = (int) Math.round(dg.fitDouble(depthStyle.getMin(), depthStyle.getMax(), p.getX(), p.getZ()));
             int width = (int) Math.round(bw.fitDouble(baseWidthStyle.getMin(), baseWidthStyle.getMax(), p.getX(), p.getZ()));
             int surface = (int) Math.round(rsurface - depth * 0.45);
