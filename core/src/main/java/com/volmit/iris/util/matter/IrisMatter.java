@@ -70,7 +70,19 @@ public class IrisMatter extends IrisRegistrant implements Matter {
     @Override
     @SuppressWarnings("unchecked")
     public <T> MatterSlice<T> slice(Class<?> c) {
-        return (MatterSlice<T>) sliceMap.computeIfAbsent(c, $ -> Objects.requireNonNull(createSlice(c, this), "Bad slice " + c.getCanonicalName()));
+        // Plain get first: the previous computeIfAbsent allocated its capturing
+        // lambda on EVERY call (including hits), and slice() sits on every
+        // block read/write through MantleChunk/MantleWriter. putIfAbsent keeps
+        // the same create-once-wins semantics under races.
+        MatterSlice<?> s = sliceMap.get(c);
+        if (s == null) {
+            s = Objects.requireNonNull(createSlice(c, this), "Bad slice " + c.getCanonicalName());
+            MatterSlice<?> prev = sliceMap.putIfAbsent(c, s);
+            if (prev != null) {
+                s = prev;
+            }
+        }
+        return (MatterSlice<T>) s;
     }
 
     @Override

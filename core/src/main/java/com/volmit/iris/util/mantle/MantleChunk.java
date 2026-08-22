@@ -167,9 +167,15 @@ public class MantleChunk extends FlaggedChunk {
     @ChunkRelativeBlockCoordinates
     @SuppressWarnings("unchecked")
     public <T> T get(int x, int y, int z, Class<T> type) {
-        return (T) getOrCreate(y >> 4)
-                .slice(type)
-                .get(x & 15, y & 15, z & 15);
+        // Read-only: a missing section reads as all-null, so plain get() avoids
+        // materializing empty Matter sections on lookup paths (the old
+        // getOrCreate allocated one on first read of any never-written section).
+        Matter matter = get(y >> 4);
+        if (matter == null) {
+            return null;
+        }
+
+        return (T) matter.slice(type).get(x & 15, y & 15, z & 15);
     }
 
     /**
