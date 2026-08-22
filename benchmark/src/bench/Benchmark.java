@@ -1424,6 +1424,102 @@ public final class Benchmark {
                 });
             }
 
+            // ---- Perfection pass (IrisPerfectionModifier.onModify) ----
+            // Real modifier (single-core deterministic queue) over a hunk with
+            // valid poppies on grass, floating poppies, and a poppy-on-poppy
+            // stack so the decorator-support fixup runs removals, cascades and
+            // a confirming second while-pass. Digest = AIR-clear write sequence
+            // via Hunk.listen.
+            {
+                final com.volmit.iris.engine.framework.Engine perfectionEngine;
+                {
+                    java.util.Map<String, Object> hard = new java.util.HashMap<>();
+                    hard.put("getCacheID", 159357);
+                    hard.put("getMetrics", new com.volmit.iris.engine.framework.EngineMetrics(10));
+                    hard.put("burst", com.volmit.iris.util.parallel.MultiBurst.burst);
+                    java.lang.reflect.InvocationHandler h = (proxy, method, args) -> {
+                        Object v = hard.get(method.getName());
+                        if (v != null) {
+                            return v;
+                        }
+                        Class<?> rt = method.getReturnType();
+                        if (rt == boolean.class) return false;
+                        if (rt == long.class) return 0L;
+                        if (rt == int.class) return 0;
+                        if (rt == double.class) return 0D;
+                        if (rt == float.class) return 0F;
+                        if (rt == short.class) return (short) 0;
+                        if (rt == byte.class) return (byte) 0;
+                        if (rt == char.class) return (char) 0;
+                        return null;
+                    };
+                    perfectionEngine = (com.volmit.iris.engine.framework.Engine)
+                            java.lang.reflect.Proxy.newProxyInstance(
+                                    Benchmark.class.getClassLoader(),
+                                    new Class[]{com.volmit.iris.engine.framework.Engine.class}, h);
+                }
+
+                final com.volmit.iris.engine.modifier.IrisPerfectionModifier perfectionModifier =
+                        new com.volmit.iris.engine.modifier.IrisPerfectionModifier(perfectionEngine);
+
+                final BlockData stone = Material.STONE.createBlockData();
+                final BlockData grass = Material.GRASS_BLOCK.createBlockData();
+                final BlockData poppy = Material.POPPY.createBlockData();
+                final Hunk<BlockData> perfectionBase = Hunk.newArrayHunk(16, 80, 16);
+                final Digest[] perfectionDigest = new Digest[1];
+                final Hunk<BlockData> perfectionHunk = perfectionBase.listen((x, y, z, t) -> {
+                    Digest d = perfectionDigest[0];
+                    d.add(x);
+                    d.add(y);
+                    d.add(z);
+                    d.add(t == null ? -1 : t.getMaterial().ordinal());
+                });
+
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "perfection-modify";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 3_000;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        perfectionDigest[0] = dg;
+                        double bh = 0;
+                        for (int i = 0; i < n; i++) {
+                            // Reset: terrain columns (stone + grass cap), then
+                            // valid/floating/stacked decorant patterns.
+                            for (int x = 0; x < 16; x++) {
+                                for (int z = 0; z < 16; z++) {
+                                    int h = 20 + ((x * 7 + z * 13) % 30);
+                                    for (int y = 0; y < h; y++) {
+                                        perfectionBase.set(x, y, z, y == h - 1 ? grass : stone);
+                                    }
+                                    if ((x + z) % 4 == 0) {
+                                        perfectionBase.set(x, h, z, poppy);
+                                    }
+                                    if ((x * z) % 5 == 0) {
+                                        perfectionBase.set(x, h + 6, z, poppy);
+                                    }
+                                    if ((x + z) % 7 == 0) {
+                                        perfectionBase.set(x, h + 1, z, poppy);
+                                    }
+                                }
+                            }
+                            perfectionModifier.onModify(0, 0, perfectionHunk, false,
+                                    new com.volmit.iris.util.context.ChunkContext(0, 0, null));
+                            bh += i;
+                        }
+                        perfectionDigest[0] = null;
+                        return bh;
+                    }
+                });
+            }
+
             // HyperLock: hit-pattern lock/unlock through with(x, z, runnable)
             // (region keys repeat, like Mantle region locking in production).
             HyperLock hl = new HyperLock(1024);
