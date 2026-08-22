@@ -10,8 +10,9 @@
 | [round5-terrain-actuator.md](round5-terrain-actuator.md) | 地形执行器：列循环不变量提升 + 矿石预检，1.55×/列 |
 | [round6-dispatch.md](round6-dispatch.md) | 派发扁平化：<1%（当时的结论——离线可测面收敛） |
 | [round7-matter-mantle.md](round7-matter-mantle.md) | Matter/Mantle 存储层 + HyperLock：推翻"需服务器"判断（Bukkit 代理桩），锁 **26.8×**、容器写 **2.62×**、序列化往返 **1.26×/-64% 分配** |
+| [round8-object-place.md](round8-object-place.md) | 对象放置写路径：IrisObject.place 五层防御克隆链塌缩——树放置 **2.44×**、stilt **2.11×**，分配 -33%/-41% |
 
 - 原始数据：`benchmark/results/round*.csv`（每场景 5 次测量）
-- 金样本：`benchmark/golden/golden.csv`（**29 场景**固定种子摘要，行为一致性的判定基准）
+- 金样本：`benchmark/golden/golden.csv`（**31 场景**固定种子摘要，行为一致性的判定基准）
 - 复现：`bash benchmark/build.sh && bash benchmark/run.sh <csv> 3 5 && bash benchmark/verify.sh benchmark/golden/golden.csv <csv>`
 - 版本改动汇总：[../../release/3.9.3-1.20.1-1.21.11.md](../../release/3.9.3-1.20.1-1.21.11.md)
