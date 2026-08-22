@@ -220,8 +220,33 @@ public final class Bukkit {
         return null;
     }
 
+    /**
+     * Always returns an inert proxy Registry. Registry's static initializer
+     * requireNonNull's MusicInstrument/GameEvent lookups, and every field it
+     * assigns from this factory must be non-null or Iris' reflective
+     * DefaultRegistryLookup NPEs while folding fields into a map. Concrete
+     * enum-backed lookups (Material, Biome, ...) still resolve offline through
+     * Registry's own SimpleRegistry fields, which this proxy never shadows.
+     */
+    @SuppressWarnings("unchecked")
     public static <T extends Keyed> Registry<T> getRegistry(Class<T> clazz) {
-        return null;
+        return (Registry<T>) Proxy.newProxyInstance(
+                Bukkit.class.getClassLoader(),
+                new Class<?>[]{Registry.class},
+                new EmptyRegistryHandler());
+    }
+
+    private static final class EmptyRegistryHandler implements InvocationHandler {
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) {
+            return switch (method.getName()) {
+                case "hashCode" -> System.identityHashCode(proxy);
+                case "equals" -> proxy == args[0];
+                case "toString" -> "BenchEmptyRegistry";
+                case "stream" -> java.util.stream.Stream.empty();
+                default -> null;
+            };
+        }
     }
 
     public static Collection<? extends Player> getOnlinePlayers() {

@@ -733,6 +733,61 @@ public final class Benchmark {
                 }
             });
 
+            // ---- IrisObject.place: full object placement write loop ----
+            // Real IrisObject (trunk + canopy, proxy BlockData), real default
+            // IrisObjectPlacement (Y-axis spin active), recording placer folds
+            // every set() (coords + material) into the digest.
+            {
+                final BlockData log = Material.OAK_LOG.createBlockData();
+                final BlockData leaves = Material.OAK_LEAVES.createBlockData();
+                final com.volmit.iris.engine.object.IrisObject tree =
+                        new com.volmit.iris.engine.object.IrisObject(9, 13, 9);
+                for (int t = 0; t < 7; t++) {
+                    tree.setUnsigned(4, t, 4, log);
+                }
+                for (int bx = 0; bx < 9; bx++) {
+                    for (int by = 5; by < 12; by++) {
+                        for (int bz = 0; bz < 9; bz++) {
+                            double dx = (bx - 4) / 4.0, dy = (by - 9) / 3.2, dz = (bz - 4) / 4.0;
+                            if (dx * dx + dy * dy + dz * dz <= 1.0 && (bx + by + bz) % 3 != 0) {
+                                tree.setUnsigned(bx, by, bz, leaves);
+                            }
+                        }
+                    }
+                }
+                final com.volmit.iris.engine.object.IrisObjectPlacement placement =
+                        new com.volmit.iris.engine.object.IrisObjectPlacement();
+                final RecordingPlacer placer = new RecordingPlacer();
+
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "object-place";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 100_000;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        Random r = new Random(seed);
+                        placer.dg = dg;
+                        double bh = 0;
+                        for (int i = 0; i < n; i++) {
+                            int x = r.nextInt(1 << 20), z = r.nextInt(1 << 20);
+                            int ret = tree.place(x, 64, z, placer, placement,
+                                    new RNG(seed + i), (com.volmit.iris.util.math.BlockPosition p, BlockData d) -> {
+                                    }, null, null);
+                            dg.add(ret);
+                            bh += ret;
+                        }
+                        return bh;
+                    }
+                });
+            }
+
             // HyperLock: hit-pattern lock/unlock through with(x, z, runnable)
             // (region keys repeat, like Mantle region locking in production).
             HyperLock hl = new HyperLock(1024);
@@ -914,6 +969,98 @@ public final class Benchmark {
 
         @Override
         public org.bukkit.block.data.BlockData getRaw(int x, int y, int z) {
+            return null;
+        }
+    }
+
+    /** Minimal array-backed IObjectPlacer that folds every set() into the digest. */
+    static final class RecordingPlacer implements com.volmit.iris.engine.object.IObjectPlacer {
+        private static final int SX = 64, SY = 128, SZ = 64;
+        private final BlockData[][][] world = new BlockData[SX][SY][SZ];
+        Digest dg;
+
+        private int fx(int x) {
+            return Math.floorMod(x, SX);
+        }
+
+        private int fy(int y) {
+            return Math.floorMod(y, SY);
+        }
+
+        private int fz(int z) {
+            return Math.floorMod(z, SZ);
+        }
+
+        @Override
+        public int getHighest(int x, int z, IrisData data) {
+            return 64;
+        }
+
+        @Override
+        public int getHighest(int x, int z, IrisData data, boolean ignoreFluid) {
+            return 64;
+        }
+
+        @Override
+        public void set(int x, int y, int z, BlockData d) {
+            dg.add(x);
+            dg.add(y);
+            dg.add(z);
+            dg.add(d == null ? -1 : d.getMaterial().ordinal());
+            world[fx(x)][fy(y)][fz(z)] = d;
+        }
+
+        @Override
+        public BlockData get(int x, int y, int z) {
+            return world[fx(x)][fy(y)][fz(z)];
+        }
+
+        @Override
+        public boolean isPreventingDecay() {
+            return false;
+        }
+
+        @Override
+        public boolean isCarved(int x, int y, int z) {
+            return false;
+        }
+
+        @Override
+        public boolean isSolid(int x, int y, int z) {
+            BlockData b = get(x, y, z);
+            return b != null && B.isSolid(b);
+        }
+
+        @Override
+        public boolean isUnderwater(int x, int z) {
+            return false;
+        }
+
+        @Override
+        public int getFluidHeight() {
+            return 0;
+        }
+
+        @Override
+        public boolean isDebugSmartBore() {
+            return false;
+        }
+
+        @Override
+        public void setTile(int xx, int yy, int zz, com.volmit.iris.engine.object.TileData tile) {
+        }
+
+        @Override
+        public <T> void setData(int xx, int yy, int zz, T data) {
+        }
+
+        @Override
+        public <T> T getData(int xx, int yy, int zz, Class<T> t) {
+            return null;
+        }
+
+        @Override
+        public com.volmit.iris.engine.framework.Engine getEngine() {
             return null;
         }
     }
