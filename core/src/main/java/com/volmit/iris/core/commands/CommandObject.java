@@ -146,6 +146,10 @@ public class CommandObject implements DecreeExecutor {
             String object
     ) {
         IrisObject o = IrisData.loadAnyObject(object, data());
+        if (o == null) {
+            sender().sendMessage(C.RED + "Unknown object: " + object);
+            return;
+        }
         sender().sendMessage("Object Size: " + o.getW() + " * " + o.getH() + " * " + o.getD() + "");
         sender().sendMessage("Blocks Used: " + NumberFormat.getIntegerInstance().format(o.getBlocks().size()));
 
@@ -211,6 +215,10 @@ public class CommandObject implements DecreeExecutor {
     @Decree(description = "Shrink an object to its minimum size")
     public void shrink(@Param(description = "The object to shrink", customHandler = ObjectHandler.class) String object) {
         IrisObject o = IrisData.loadAnyObject(object, data());
+        if (o == null) {
+            sender().sendMessage(C.RED + "Unknown object: " + object);
+            return;
+        }
         sender().sendMessage("Current Object Size: " + o.getW() + " * " + o.getH() + " * " + o.getD());
         o.shrinkwrap();
         sender().sendMessage("New Object Size: " + o.getW() + " * " + o.getH() + " * " + o.getD());
@@ -335,6 +343,10 @@ public class CommandObject implements DecreeExecutor {
 //            IrisObjectPlacementScaleInterpolator interpolator
     ) {
         IrisObject o = IrisData.loadAnyObject(object, data());
+        if (o == null) {
+            sender().sendMessage(C.RED + "Unknown object: " + object);
+            return;
+        }
         double maxScale = Double.max(10 - o.getBlocks().size() / 10000d, 1);
         if (scale > maxScale) {
             sender().sendMessage(C.YELLOW + "Indicated scale exceeds maximum. Downscaled to maximum: " + maxScale);
@@ -400,6 +412,20 @@ public class CommandObject implements DecreeExecutor {
         }
 
         File file = Iris.service(StudioSVC.class).getWorkspaceFile(dimension.getLoadKey(), "objects", name + ".iob");
+
+        // name may contain '/' for subfolders, but the resolved file must stay
+        // inside the pack's objects folder (no ../ escapes)
+        try {
+            java.nio.file.Path objectsRoot = Iris.service(StudioSVC.class)
+                    .getWorkspaceFile(dimension.getLoadKey(), "objects").getCanonicalFile().toPath();
+            if (!file.getCanonicalFile().toPath().startsWith(objectsRoot)) {
+                sender().sendMessage(C.RED + "Object names cannot escape the objects folder!");
+                return;
+            }
+        } catch (IOException e) {
+            sender().sendMessage(C.RED + "Failed to resolve object path: " + e.getMessage());
+            return;
+        }
 
         if (file.exists() && !overwrite) {
             sender().sendMessage(C.RED + "File already exists. Set overwrite=true to overwrite it.");

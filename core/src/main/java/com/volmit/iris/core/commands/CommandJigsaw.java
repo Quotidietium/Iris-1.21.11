@@ -78,9 +78,15 @@ public class CommandJigsaw implements DecreeExecutor {
             @Param(description = "The object to use for this piece", customHandler = ObjectHandler.class)
             String object
     ) {
+        if (piece == null || !piece.matches("[a-zA-Z0-9_-]+")
+                || project == null || !project.matches("[a-zA-Z0-9_-]+")) {
+            sender().sendMessage(C.RED + "Piece and project names may only contain letters, numbers, - and _");
+            return;
+        }
+
         IrisObject o = IrisData.loadAnyObject(object, data());
 
-        if (object == null) {
+        if (o == null) {
             sender().sendMessage(C.RED + "Failed to find existing object");
             return;
         }
