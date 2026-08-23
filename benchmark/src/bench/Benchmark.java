@@ -1839,6 +1839,131 @@ public final class Benchmark {
                         return bh;
                     }
                 });
+
+                // Saturated-pool shape (production pregen): 8 caller threads
+                // each construct ChunkContexts concurrently; every construct
+                // fans 96 row tasks into the SHARED MultiBurst pool, so the
+                // pool is kept busy and per-chunk orchestration overhead is
+                // measured under contention rather than in the single-chunk
+                // worst case (idle-pool wake/steal churn dominates there).
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "ctx-fill-par";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 2_000;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        final int threads = 8;
+                        Digest[] parts = new Digest[threads];
+                        java.util.concurrent.Future<Double>[] futures = new java.util.concurrent.Future[threads];
+                        try {
+                            for (int t = 0; t < threads; t++) {
+                                parts[t] = new Digest();
+                                final int ft = t;
+                                final Digest local = parts[t];
+                                futures[t] = PARALLEL_POOL.submit(() -> {
+                                    Random r = new Random(seed * 31 + ft);
+                                    double bh = 0;
+                                    for (int i = 0; i < n; i++) {
+                                        int px = (r.nextInt(1 << 18) - (1 << 17)) << 4;
+                                        int pz = (r.nextInt(1 << 18) - (1 << 17)) << 4;
+                                        com.volmit.iris.util.context.ChunkContext ctx =
+                                                new com.volmit.iris.util.context.ChunkContext(
+                                                        px, pz, hS, bS, cS, rS, fS, null, true);
+                                        for (int j = 0; j < 16; j++) {
+                                            for (int k = 0; k < 16; k++) {
+                                                bh += ctx.getHeight().get(k, j);
+                                                local.add(ctx.getHeight().get(k, j));
+                                                local.add(poolIndex.applyAsInt(ctx.getBiome().get(k, j)));
+                                                local.add(poolIndex.applyAsInt(ctx.getCave().get(k, j)));
+                                                local.add(poolIndex.applyAsInt(ctx.getRock().get(k, j)));
+                                                local.add(poolIndex.applyAsInt(ctx.getFluid().get(k, j)));
+                                            }
+                                        }
+                                    }
+                                    return bh;
+                                });
+                            }
+                            double bh = 0;
+                            for (int t = 0; t < threads; t++) {
+                                bh += futures[t].get();
+                                dg.h ^= parts[t].h;
+                                dg.h *= 0x100000001b3L;
+                                dg.count += parts[t].count;
+                            }
+                            return bh;
+                        } catch (java.util.concurrent.ExecutionException | InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                });
+
+                // Orchestration A/B (round 17): identical 6-stream grids,
+                // identical coordinate sequence and readback as ctx-fill, so
+                // every variant's per-iteration digest MUST equal ctx-fill's.
+                // ctx-orch-submit = the production shape (96 row tasks via
+                // executor.submit + sequential get); ctx-orch-latch = plain
+                // execute + CountDownLatch; ctx-orch-cc = CountedCompleter
+                // children forked under one root; ctx-orch-g24 = 24 tasks of
+                // 4 rows each.
+                for (String variant : new String[]{"submit", "latch", "cc", "g24"}) {
+                    final String v = variant;
+                    out.add(new Scenario() {
+                        @Override
+                        public String name() {
+                            return "ctx-orch-" + v;
+                        }
+
+                        @Override
+                        public int ops() {
+                            return 2_000;
+                        }
+
+                        @Override
+                        public double run(int n, long seed, Digest dg) {
+                            Random r = new Random(seed);
+                            double bh = 0;
+                            for (int i = 0; i < n; i++) {
+                                int px = (r.nextInt(1 << 18) - (1 << 17)) << 4;
+                                int pz = (r.nextInt(1 << 18) - (1 << 17)) << 4;
+                                com.volmit.iris.util.context.ChunkedDataCache<Double> hC =
+                                        new com.volmit.iris.util.context.ChunkedDataCache<>(hS, px, pz);
+                                com.volmit.iris.util.context.ChunkedDataCache<IrisBiome> bC =
+                                        new com.volmit.iris.util.context.ChunkedDataCache<>(bS, px, pz);
+                                com.volmit.iris.util.context.ChunkedDataCache<IrisBiome> cC =
+                                        new com.volmit.iris.util.context.ChunkedDataCache<>(cS, px, pz);
+                                com.volmit.iris.util.context.ChunkedDataCache<BlockData> rC =
+                                        new com.volmit.iris.util.context.ChunkedDataCache<>(rS, px, pz);
+                                com.volmit.iris.util.context.ChunkedDataCache<BlockData> fC =
+                                        new com.volmit.iris.util.context.ChunkedDataCache<>(fS, px, pz);
+                                com.volmit.iris.util.context.ChunkedDataCache<?>[] cs = {hC, bC, cC, rC, fC};
+                                try {
+                                    fillOrchestrated(cs, v);
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                    throw new RuntimeException(e);
+                                }
+                                for (int j = 0; j < 16; j++) {
+                                    for (int k = 0; k < 16; k++) {
+                                        bh += hC.get(k, j);
+                                        dg.add(hC.get(k, j));
+                                        dg.add(poolIndex.applyAsInt(bC.get(k, j)));
+                                        dg.add(poolIndex.applyAsInt(cC.get(k, j)));
+                                        dg.add(poolIndex.applyAsInt(rC.get(k, j)));
+                                        dg.add(poolIndex.applyAsInt(fC.get(k, j)));
+                                    }
+                                }
+                            }
+                            return bh;
+                        }
+                    });
+                }
             }
 
             // ---- FlaggedChunk raise path (double-checked raise + chunk alloc) ----
@@ -2104,6 +2229,108 @@ public final class Benchmark {
 
     static int clamp(int v, int n) {
         return v < 0 ? 0 : Math.min(v, n - 1);
+    }
+
+    /** Round-17 orchestration A/B: fills the given caches via different task shapes. */
+    static void fillOrchestrated(com.volmit.iris.util.context.ChunkedDataCache<?>[] caches, String variant)
+            throws InterruptedException {
+        java.util.concurrent.ExecutorService ex = com.volmit.iris.util.parallel.MultiBurst.burst;
+        switch (variant) {
+            case "submit" -> {
+                java.util.List<java.util.concurrent.Future<?>> fs = new ArrayList<>(caches.length * 16);
+                for (com.volmit.iris.util.context.ChunkedDataCache<?> c : caches) {
+                    for (int j = 0; j < 16; j++) {
+                        final com.volmit.iris.util.context.ChunkedDataCache<?> cc = c;
+                        final int row = j;
+                        fs.add(ex.submit(() -> cc.fillRow(row)));
+                    }
+                }
+                for (java.util.concurrent.Future<?> f : fs) {
+                    try {
+                        f.get();
+                    } catch (java.util.concurrent.ExecutionException e) {
+                        throw new RuntimeException(e.getCause());
+                    }
+                }
+            }
+            case "latch" -> {
+                java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(caches.length * 16);
+                java.util.concurrent.atomic.AtomicReference<Throwable> err = new java.util.concurrent.atomic.AtomicReference<>();
+                for (com.volmit.iris.util.context.ChunkedDataCache<?> c : caches) {
+                    for (int j = 0; j < 16; j++) {
+                        final com.volmit.iris.util.context.ChunkedDataCache<?> cc = c;
+                        final int row = j;
+                        ex.execute(() -> {
+                            try {
+                                cc.fillRow(row);
+                            } catch (Throwable t) {
+                                err.compareAndSet(null, t);
+                            } finally {
+                                latch.countDown();
+                            }
+                        });
+                    }
+                }
+                latch.await();
+                Throwable t = err.get();
+                if (t != null) {
+                    throw new RuntimeException(t);
+                }
+            }
+            case "cc" -> {
+                java.util.concurrent.atomic.AtomicReference<Throwable> err = new java.util.concurrent.atomic.AtomicReference<>();
+                java.util.concurrent.CountedCompleter<Void> root = new java.util.concurrent.CountedCompleter<>() {
+                    @Override
+                    public void compute() {
+                    }
+                };
+                root.setPendingCount(caches.length * 16 - 1);
+                for (com.volmit.iris.util.context.ChunkedDataCache<?> c : caches) {
+                    for (int j = 0; j < 16; j++) {
+                        final com.volmit.iris.util.context.ChunkedDataCache<?> cc = c;
+                        final int row = j;
+                        new java.util.concurrent.CountedCompleter<Void>(root) {
+                            @Override
+                            public void compute() {
+                                try {
+                                    cc.fillRow(row);
+                                } catch (Throwable t) {
+                                    err.compareAndSet(null, t);
+                                }
+                                tryComplete();
+                            }
+                        }.fork();
+                    }
+                }
+                root.invoke();
+                Throwable t = err.get();
+                if (t != null) {
+                    throw new RuntimeException(t);
+                }
+            }
+            case "g24" -> {
+                java.util.List<java.util.concurrent.Future<?>> fs = new ArrayList<>(caches.length * 4);
+                for (com.volmit.iris.util.context.ChunkedDataCache<?> c : caches) {
+                    for (int g = 0; g < 4; g++) {
+                        final com.volmit.iris.util.context.ChunkedDataCache<?> cc = c;
+                        final int gg = g;
+                        fs.add(ex.submit(() -> {
+                            for (int j = gg * 4; j < gg * 4 + 4; j++) {
+                                cc.fillRow(j);
+                            }
+                        }));
+                    }
+                }
+                for (java.util.concurrent.Future<?> f : fs) {
+                    try {
+                        f.get();
+                    } catch (java.util.concurrent.ExecutionException e) {
+                        throw new RuntimeException(e.getCause());
+                    }
+                }
+            }
+            default -> throw new IllegalArgumentException(variant);
+        }
     }
 
     /** Hunk that folds every set() into the benchmark digest (y + nullness). */

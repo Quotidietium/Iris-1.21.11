@@ -42,3 +42,8 @@ ctx-fill,d8b5f2f2a60f5f1e,2560000
 ctx-fill-cellwise,d8b5f2f2a60f5f1e,2560000
 flag-raise,2e3649806306a025,400000
 plate-io,e58bba3d3bb78da5,30000
+ctx-fill-par,5fed533d5c5bb425,20480000
+ctx-orch-submit,d8b5f2f2a60f5f1e,2560000
+ctx-orch-latch,d8b5f2f2a60f5f1e,2560000
+ctx-orch-cc,d8b5f2f2a60f5f1e,2560000
+ctx-orch-g24,d8b5f2f2a60f5f1e,2560000
