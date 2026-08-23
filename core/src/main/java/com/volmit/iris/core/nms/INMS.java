@@ -103,16 +103,25 @@ public class INMS {
     }
 
     private static String getTag(List<Version> versions, String def) {
-        var version = Bukkit.getServer().getBukkitVersion().split("-")[0].split("\\.", 3);
-        int major = 0;
-        int minor = 0;
+        int major;
+        int minor;
+        try {
+            var version = Bukkit.getServer().getBukkitVersion().split("-")[0].split("\\.", 3);
+            major = 0;
+            minor = 0;
 
-        if (version.length > 2) {
-            major = Integer.parseInt(version[1]);
-            minor = Integer.parseInt(version[2]);
-        } else if (version.length == 2) {
-            major = Integer.parseInt(version[1]);
+            if (version.length > 2) {
+                major = Integer.parseInt(version[1]);
+                minor = Integer.parseInt(version[2]);
+            } else if (version.length == 2) {
+                major = Integer.parseInt(version[1]);
+            }
+        } catch (Throwable e) {
+            // unparseable version string on exotic forks must not kill static init
+            Iris.reportError(e);
+            return def;
         }
+
         if (CURRENT.major < major || CURRENT.minor < minor) {
             return versions.getFirst().tag;
         }
