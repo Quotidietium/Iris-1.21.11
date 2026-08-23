@@ -121,12 +121,12 @@ public class IrisDepositModifier extends EngineAssignedModifier<BlockData> {
                 continue;
 
             boolean replaceBedrock = k.isReplaceBedrock();
-            // Single-pass entry iteration: keys()+get(j) cost one BlockVector
-            // plus two boxed map keys and a double lookup per block.
-            clump.getBlocks().forEach((j, ore) -> {
-                int nx = j.getBlockX() + x;
-                int ny = j.getBlockY() + y;
-                int nz = j.getBlockZ() + z;
+            // Single-pass zero-alloc entry iteration: the BlockVector-based
+            // forEach allocated one vector per block purely to read 3 ints.
+            clump.getBlocks().forEachCoords((bx, by, bz, ore) -> {
+                int nx = bx + x;
+                int ny = by + y;
+                int nz = bz + z;
 
                 if (ny > height || nx > 15 || nx < 0 || ny > engineHeight || ny < 0 || nz < 0 || nz > 15) {
                     return;

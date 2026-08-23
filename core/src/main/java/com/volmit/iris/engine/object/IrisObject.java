@@ -927,29 +927,40 @@ public class IrisObject extends IrisRegistrant {
                 }
             }
 
-            for (var entry : blocks) {
-                var g = entry.getKey();
+            // Cursor iteration: zero allocation per block (the EntryIterator
+            // allocated a BlockVector + SimpleEntry per entry). gVec is a
+            // reusable key/argument vector — rotate/translate never mutate
+            // their argument and reads below stay within the iteration.
+            boolean hasStates = !states.isEmpty();
+            BlockVector gVec = new BlockVector();
+            for (VectorMap<BlockData>.CursorIterator it = blocks.cursorIterator(); it.hasNext(); ) {
+                VectorMap.Cursor<BlockData> entry = it.next();
                 BlockData d;
                 TileData tile = null;
 
                 try {
-                    d = entry.getValue();
-                    tile = states.get(g);
+                    d = entry.value;
+                    gVec.setX(entry.x);
+                    gVec.setY(entry.y);
+                    gVec.setZ(entry.z);
+                    if (hasStates) {
+                        tile = states.get(gVec);
+                    }
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    Iris.warn("Failed to read block node " + g.getBlockX() + "," + g.getBlockY() + "," + g.getBlockZ() + " in object " + getLoadKey() + " (cme)");
+                    Iris.warn("Failed to read block node " + entry.x + "," + entry.y + "," + entry.z + " in object " + getLoadKey() + " (cme)");
                     d = AIR;
                 }
 
                 if (d == null) {
-                    Iris.warn("Failed to read block node " + g.getBlockX() + "," + g.getBlockY() + "," + g.getBlockZ() + " in object " + getLoadKey() + " (null)");
+                    Iris.warn("Failed to read block node " + entry.x + "," + entry.y + "," + entry.z + " in object " + getLoadKey() + " (null)");
                     d = AIR;
                 }
 
                 // rotate/translate never mutate their argument and either
                 // return a fresh vector or the argument itself; i is only read
                 // below, so the previous 5-deep defensive clone chain is gone.
-                BlockVector i = config.getRotation().rotate(g, spinx, spiny, spinz);
+                BlockVector i = config.getRotation().rotate(gVec, spinx, spiny, spinz);
                 BlockData data = d.clone();
                 i = config.getTranslate().translate(i, config.getRotation(), spinx, spiny, spinz);
 
@@ -1031,8 +1042,8 @@ public class IrisObject extends IrisRegistrant {
                     listener.accept(new BlockPosition(xx, yy, zz), data);
                 }
 
-                if (markers != null && markers.containsKey(g)) {
-                    placer.getEngine().getMantle().getMantle().set(xx, yy, zz, new MatterMarker(markers.get(g)));
+                if (markers != null && markers.containsKey(gVec)) {
+                    placer.getEngine().getMantle().getMantle().set(xx, yy, zz, new MatterMarker(markers.get(gVec)));
                 }
 
                 boolean wouldReplace = B.isVineBlock(data) && B.isSolid(placer.get(xx, yy, zz));
@@ -1054,28 +1065,34 @@ public class IrisObject extends IrisRegistrant {
         if (stilting) {
             readLock.lock();
             IrisStiltSettings settings = config.getStiltSettings();
-            for (BlockVector g : blocks.keys()) {
+            // Cursor iteration like the main loop: no per-key BlockVector and
+            // no second blocks.get(g) lookup per block.
+            BlockVector gVec = new BlockVector();
+            for (VectorMap<BlockData>.CursorIterator it = blocks.cursorIterator(); it.hasNext(); ) {
+                VectorMap.Cursor<BlockData> entry = it.next();
                 BlockData d;
 
                 if (settings == null || settings.getPalette() == null) {
                     try {
-                        d = blocks.get(g);
+                        d = entry.value;
                     } catch (Throwable e) {
                         Iris.reportError(e);
-                        Iris.warn("Failed to read block node " + g.getBlockX() + "," + g.getBlockY() + "," + g.getBlockZ() + " in object " + getLoadKey() + " (stilt cme)");
+                        Iris.warn("Failed to read block node " + entry.x + "," + entry.y + "," + entry.z + " in object " + getLoadKey() + " (stilt cme)");
                         d = AIR;
                     }
 
                     if (d == null) {
-                        Iris.warn("Failed to read block node " + g.getBlockX() + "," + g.getBlockY() + "," + g.getBlockZ() + " in object " + getLoadKey() + " (stilt null)");
+                        Iris.warn("Failed to read block node " + entry.x + "," + entry.y + "," + entry.z + " in object " + getLoadKey() + " (stilt null)");
                         d = AIR;
                     }
                 } else
                     d = config.getStiltSettings().getPalette().get(rng, x, y, z, rdata);
 
-
+                gVec.setX(entry.x);
+                gVec.setY(entry.y);
+                gVec.setZ(entry.z);
                 // Same clone-chain reduction as the main loop (read-only use).
-                BlockVector i = config.getRotation().rotate(g, spinx, spiny, spinz);
+                BlockVector i = config.getRotation().rotate(gVec, spinx, spiny, spinz);
                 i = config.getTranslate().translate(i, config.getRotation(), spinx, spiny, spinz);
                 d = config.getRotation().rotate(d, spinx, spiny, spinz);
 

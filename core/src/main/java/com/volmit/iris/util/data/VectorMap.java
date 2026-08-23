@@ -13,13 +13,19 @@ import java.util.function.Function;
 
 public class VectorMap<T> implements Iterable<Map.Entry<BlockVector, T>> {
     private final Map<Key, Map<Key, T>> map = new KMap<>();
+    private int count;
 
     public int size() {
-        return map.values().stream().mapToInt(Map::size).sum();
+        return count;
     }
 
+    /**
+     * O(1) emptiness probe (the old implementation streamed every chunk map).
+     * Hot callers use it to skip per-block tile-state lookups entirely for
+     * stateless objects, which is the common case.
+     */
     public boolean isEmpty() {
-        return map.values().stream().allMatch(Map::isEmpty);
+        return count == 0;
     }
 
     public boolean containsKey(@NonNull BlockVector vector) {
@@ -36,19 +42,43 @@ public class VectorMap<T> implements Iterable<Map.Entry<BlockVector, T>> {
         return chunk == null ? null : chunk.get(relative(vector));
     }
 
+    public @Nullable T get(int x, int y, int z) {
+        var chunk = map.get(new Key(x >> 10, y >> 10, z >> 10));
+        return chunk == null ? null : chunk.get(new Key(x & 0x3FF, y & 0x3FF, z & 0x3FF));
+    }
+
     public @Nullable T put(@NonNull BlockVector vector, @NonNull T value) {
-        return map.computeIfAbsent(chunk(vector), k -> new KMap<>())
+        T old = map.computeIfAbsent(chunk(vector), k -> new KMap<>())
                 .put(relative(vector), value);
+        if (old == null) {
+            count++;
+        }
+        return old;
     }
 
     public @Nullable T computeIfAbsent(@NonNull BlockVector vector, @NonNull Function<@NonNull BlockVector, @NonNull T> mappingFunction) {
-         return map.computeIfAbsent(chunk(vector), k -> new KMap<>())
-                 .computeIfAbsent(relative(vector), $ -> mappingFunction.apply(vector));
+        Map<Key, T> chunkMap = map.computeIfAbsent(chunk(vector), k -> new KMap<>());
+        Key rel = relative(vector);
+        T v = chunkMap.get(rel);
+        if (v == null) {
+            v = chunkMap.computeIfAbsent(rel, $ -> mappingFunction.apply(vector));
+            if (v != null) {
+                count++;
+            }
+        }
+        return v;
     }
 
     public @Nullable T remove(@NonNull BlockVector vector) {
         var chunk = map.get(chunk(vector));
-        return chunk == null ? null : chunk.remove(relative(vector));
+        if (chunk == null) {
+            return null;
+        }
+        T old = chunk.remove(relative(vector));
+        if (old != null) {
+            count--;
+        }
+        return old;
     }
 
     public void putAll(@NonNull VectorMap<T> map) {
@@ -57,6 +87,7 @@ public class VectorMap<T> implements Iterable<Map.Entry<BlockVector, T>> {
 
     public void clear() {
         map.clear();
+        count = 0;
     }
 
     public void forEach(@NonNull BiConsumer<@NonNull BlockVector, @NonNull T> consumer) {
@@ -70,6 +101,28 @@ public class VectorMap<T> implements Iterable<Map.Entry<BlockVector, T>> {
                     value
             ));
         });
+    }
+
+    /**
+     * Allocation-free entry iteration: delivers the resolved coordinates
+     * directly instead of a fresh BlockVector per entry (plus, unlike the
+     * EntryIterator, no SimpleEntry wrapper). Same chunk-then-relative
+     * traversal order as {@link #forEach(BiConsumer)}.
+     */
+    public void forEachCoords(@NonNull CoordinateConsumer<@NonNull T> consumer) {
+        map.forEach((chunk, values) -> {
+            int rX = chunk.x << 10;
+            int rY = chunk.y << 10;
+            int rZ = chunk.z << 10;
+
+            values.forEach((relative, value) ->
+                    consumer.accept(rX + relative.x, rY + relative.y, rZ + relative.z, value));
+        });
+    }
+
+    @FunctionalInterface
+    public interface CoordinateConsumer<T> {
+        void accept(int x, int y, int z, T value);
     }
 
     private static Key chunk(BlockVector vector) {
@@ -91,6 +144,54 @@ public class VectorMap<T> implements Iterable<Map.Entry<BlockVector, T>> {
 
     public @NotNull ValueIterator values() {
         return new ValueIterator();
+    }
+
+    /**
+     * Zero-allocation-per-entry iteration: next() always returns the same
+     * mutable cursor (coordinates + value), so placement loops that only read
+     * each block pay no BlockVector / SimpleEntry allocation. Traversal order
+     * is identical to {@link #iterator()}. The cursor must not be retained
+     * across iterations.
+     */
+    public @NotNull CursorIterator cursorIterator() {
+        return new CursorIterator();
+    }
+
+    public static final class Cursor<T> {
+        public int x, y, z;
+        public T value;
+    }
+
+    public class CursorIterator implements Iterator<Cursor<T>> {
+        private final Iterator<Map.Entry<Key, Map<Key, T>>> chunkIterator = map.entrySet().iterator();
+        private Iterator<Map.Entry<Key, T>> relativeIterator;
+        private final Cursor<T> cursor = new Cursor<>();
+        private int rX, rY, rZ;
+
+        @Override
+        public boolean hasNext() {
+            return relativeIterator != null && relativeIterator.hasNext() || chunkIterator.hasNext();
+        }
+
+        @Override
+        public Cursor<T> next() {
+            if (relativeIterator == null || !relativeIterator.hasNext()) {
+                if (!chunkIterator.hasNext()) throw new IllegalStateException("No more elements");
+                var chunk = chunkIterator.next();
+                rX = chunk.getKey().x << 10;
+                rY = chunk.getKey().y << 10;
+                rZ = chunk.getKey().z << 10;
+                relativeIterator = chunk.getValue().entrySet().iterator();
+            }
+
+            var entry = relativeIterator.next();
+            Key k = entry.getKey();
+            cursor.x = rX + k.x;
+            cursor.y = rY + k.y;
+            cursor.z = rZ + k.z;
+            cursor.value = entry.getValue();
+            return cursor;
+        }
     }
 
     public class EntryIterator implements Iterator<Map.Entry<BlockVector, T>> {
