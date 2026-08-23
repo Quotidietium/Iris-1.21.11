@@ -18,6 +18,7 @@
 | [round13-heightlayers.md](round13-heightlayers.md) | 高度采样与铺层：AtomicCache.peek() 命中路径加固（98 处 aquire-lambda 模式清扫热链）+ 层循环提升——持平（EA 已消除小链路分配；对内联退化画像免疫），覆盖封口 39 场景 |
 | [round14-coroutines.md](round14-coroutines.md) | 每区块协程开销消除：引擎 4 个 Kotlin 类 Java 化——ChunkContext 1536 launch/区块→96 行任务（**4.23×**）、FlaggedChunk 256 Mutex/块→1 锁、MatterGenerator 去 runBlocking；stub 全删、golden 42 场景 |
 | [round15-fillfanout-ioaudit.md](round15-fillfanout-ioaudit.md) | 预填充扇出调参（每流任务 160.7µs vs 96 行任务 95.9µs，负结果）+ 组件复用预填充值不可行证明（context 属中心区块）+ plate-io 封口 Mantle IO（42.4ms/op，双写为崩溃持久性设计）——golden 43 场景，离线可测面收敛 |
+| [round16-hotpath-reprofiling.md](round16-hotpath-reprofiling.md) | 全面重剖析（JFR 工具化，两次剖析污染自我纠错）+ 每块分配/查找清扫：VectorMap 游标化、layer 每层单 RNG、CNG 固定元数 fit、7 站点 peek-first——layers 1.09×/-69% B、stilt 1.10×/-35% B；**R15 plate-io golden 跨进程缺口封死**（createdAt 墙钟根因）；2D 噪声实走 3D 内核记录为永久禁区 |
 
 - 原始数据:`benchmark/results/round*.csv`(每场景 5 次测量)
 - 金样本:`benchmark/golden/golden.csv`(**43 场景**固定种子摘要,行为一致性的判定基准)
