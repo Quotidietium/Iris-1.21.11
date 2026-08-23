@@ -295,7 +295,13 @@ public class VirtualDecreeCommand {
             String stringParam = knownInputs.get(x);
             int original = in.indexOf(stringParam);
 
-            String[] v = stringParam.split("\\Q=\\E");
+            String[] v = stringParam.split("\\Q=\\E", 2);
+            if (v.length < 2 || v[1].isEmpty()) {
+                // "name=" with no value: trailing empties are stripped by split,
+                // indexing v[1] would throw AIOOBE - treat as unknown input
+                sender.sendMessage(C.YELLOW + "Missing value for parameter: " + v[0] + " (usage: " + v[0] + "=<value>)");
+                continue;
+            }
             String key = v[0];
             String value = v[1];
             DecreeParameter param = null;
@@ -402,7 +408,14 @@ public class VirtualDecreeCommand {
         } else if (args.size() == 1) {
             for (String i : args) {
                 if (i.startsWith("help=")) {
-                    sender.sendDecreeHelp(this, Integer.parseInt(i.split("\\Q=\\E")[1]) - 1);
+                    int page;
+                    try {
+                        page = Integer.parseInt(i.split("\\Q=\\E")[1]) - 1;
+                    } catch (NumberFormatException e) {
+                        sender.sendMessage("Invalid help page: " + i.split("\\Q=\\E")[1]);
+                        return true;
+                    }
+                    sender.sendDecreeHelp(this, page);
                     return true;
                 }
             }
@@ -485,8 +498,9 @@ public class VirtualDecreeCommand {
                     getNode().getMethod().setAccessible(true);
                     getNode().getMethod().invoke(getNode().getInstance(), params);
                 } catch (Throwable e) {
+                    Iris.reportError(e);
                     e.printStackTrace();
-                    throw new RuntimeException("Failed to execute <INSERT REAL NODE HERE>"); // TODO:
+                    sender.sendMessage(C.RED + "Command failed: " + e.getClass().getSimpleName() + " (see console for details)");
                 } finally {
                     DecreeContext.remove();
                 }
