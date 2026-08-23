@@ -75,6 +75,10 @@ public class ChunkContext {
     }
 
     private void fillAll() {
+        // One task per (stream, row): 96 executor submissions replace the old
+        // 1536 coroutine launches while keeping the cold-cache fan-out (a
+        // per-stream task would serialize the heavy height stream on one
+        // thread: measured 160.7us vs 95.9us on the ctx-fill scenario).
         ChunkedDataCache<?>[] caches = {height, biome, cave, rock, fluid, region};
         List<Future<?>> futures = null;
         for (ChunkedDataCache<?> c : caches) {

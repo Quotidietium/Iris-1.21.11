@@ -54,6 +54,18 @@ public class ChunkedDataCache<T> {
     }
 
     /**
+     * Sample the full grid, row-major. Callable from any thread.
+     */
+    public void fill() {
+        if (!cache) return;
+        for (int j = 0; j < 16; j++) {
+            for (int i = 0; i < 16; i++) {
+                data[(j << 4) + i] = stream.get((double) (x + i), (double) (z + j));
+            }
+        }
+    }
+
+    /**
      * Sample one grid row (z-relative {@code j}) into the backing array.
      * Rows are disjoint, so this is safe to call from any thread.
      */
