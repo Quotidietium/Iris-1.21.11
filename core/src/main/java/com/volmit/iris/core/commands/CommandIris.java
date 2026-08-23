@@ -382,13 +382,17 @@ public class CommandIris implements DecreeExecutor {
             boolean overwrite
     ) {
         boolean trim = false;
-        sender().sendMessage(C.GREEN + "Downloading pack: " + pack + "/" + branch + (trim ? " trimmed" : "") + (overwrite ? " overwriting" : ""));
-        if (pack.equals("overworld")) {
-            String url = "https://github.com/IrisDimensions/overworld/releases/download/" + INMS.OVERWORLD_TAG + "/overworld.zip";
-            Iris.service(StudioSVC.class).downloadRelease(sender(), url, trim, overwrite);
-        } else {
-            Iris.service(StudioSVC.class).downloadSearch(sender(), "IrisDimensions/" + pack + "/" + branch, trim, overwrite);
-        }
+        sender().sendMessage(C.GREEN + "Downloading pack: " + pack + "/" + branch + (trim ? " trimmed" : "") + (overwrite ? " overwriting" : "") + " (async)");
+        // Downloads block on network IO; run off the main thread so a slow/hung
+        // GitHub request cannot freeze the whole server
+        J.a(() -> {
+            if (pack.equals("overworld")) {
+                String url = "https://github.com/IrisDimensions/overworld/releases/download/" + INMS.OVERWORLD_TAG + "/overworld.zip";
+                Iris.service(StudioSVC.class).downloadRelease(sender(), url, trim, overwrite);
+            } else {
+                Iris.service(StudioSVC.class).downloadSearch(sender(), "IrisDimensions/" + pack + "/" + branch, trim, overwrite);
+            }
+        });
     }
 
     @Decree(description = "Get metrics for your world", aliases = "measure", origin = DecreeOrigin.PLAYER)

@@ -52,12 +52,13 @@ public class StudioSVC implements IrisService {
     public static final String LISTING = "https://raw.githubusercontent.com/IrisDimensions/_listing/main/listing-v2.json";
     public static final String WORKSPACE_NAME = "packs";
     private static final AtomicCache<Integer> counter = new AtomicCache<>();
+    private static final Object DOWNLOAD_LOCK = new Object();
     private final KMap<String, String> cacheListing = null;
     private IrisProject activeProject;
 
     @Override
     public void onEnable() {
-        J.s(() -> {
+        J.a(() -> {
             String pack = IrisSettings.get().getGenerator().getDefaultWorldType();
             File f = IrisPack.packsPack(pack);
 
@@ -202,6 +203,14 @@ public class StudioSVC implements IrisService {
     }
 
     public void download(VolmitSender sender, String repo, String branch, boolean trim, boolean forceOverwrite, boolean directUrl) throws JsonSyntaxException, IOException {
+        // Serialized: pack downloads may now run off the main thread (async onEnable /
+        // /iris download command); concurrent unpack+copy into the packs folder would corrupt it
+        synchronized (DOWNLOAD_LOCK) {
+            downloadInternal(sender, repo, branch, trim, forceOverwrite, directUrl);
+        }
+    }
+
+    private void downloadInternal(VolmitSender sender, String repo, String branch, boolean trim, boolean forceOverwrite, boolean directUrl) throws JsonSyntaxException, IOException {
         String url = directUrl ? branch : "https://codeload.github.com/" + repo + "/zip/refs/heads/" + branch;
         sender.sendMessage("Downloading " + url + " "); //The extra space stops a bug in adventure API from repeating the last letter of the URL
         File zip = Iris.getNonCachedFile("pack-" + trim + "-" + repo, url);
