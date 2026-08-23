@@ -1049,9 +1049,8 @@ public final class Benchmark {
                     heightGrid[i] = (double) (100 + ((i * 7 + i / 16) % 11));
                 }
                 final com.volmit.iris.util.context.ChunkContext ctx =
-                        new com.volmit.iris.util.context.ChunkContext(0, 0, null)
-                                .height(new com.volmit.iris.util.context.ChunkedDataCache<Double>(null, 0, 0)
-                                        .prefill(heightGrid));
+                        new com.volmit.iris.util.context.ChunkContext(0, 0,
+                                gridStream(heightGrid, 100.0), null, null, null, null, null, true);
 
                 final MantleChunk depChunk = new MantleChunk(16, 0, 0);
                 final BlockData deepslate = Material.DEEPSLATE.createBlockData();
@@ -1350,11 +1349,9 @@ public final class Benchmark {
                     carveFluid[i] = water;
                 }
                 final com.volmit.iris.util.context.ChunkContext carveCtx =
-                        new com.volmit.iris.util.context.ChunkContext(0, 0, null)
-                                .height(new com.volmit.iris.util.context.ChunkedDataCache<Double>(null, 0, 0)
-                                        .prefill(carveHeights))
-                                .fluid(new com.volmit.iris.util.context.ChunkedDataCache<BlockData>(null, 0, 0)
-                                        .prefill(carveFluid));
+                        new com.volmit.iris.util.context.ChunkContext(0, 0,
+                                gridStream(carveHeights, 100.0), null, null, null,
+                                gridStream(carveFluid, water), null, true);
 
                 final Hunk<BlockData> carveBase = Hunk.newArrayHunk(16, 80, 16);
                 final Digest[] carveDigest = new Digest[1];
@@ -1511,7 +1508,8 @@ public final class Benchmark {
                                 }
                             }
                             perfectionModifier.onModify(0, 0, perfectionHunk, false,
-                                    new com.volmit.iris.util.context.ChunkContext(0, 0, null));
+                                    new com.volmit.iris.util.context.ChunkContext(
+                                            0, 0, null, null, null, null, null, null, false));
                             bh += i;
                         }
                         perfectionDigest[0] = null;
@@ -1702,8 +1700,194 @@ public final class Benchmark {
             });
         }
 
-        return out;
-    }
+            // ---- Chunk context prefill (per-chunk fixed cost: 6 stream snapshots) ----
+            // Six real streams with production-shaped per-sample work: the three
+            // double streams stack 3 CNG octaves each, the three object streams
+            // pick from a fixed pool on one noise call. ctx-fill = the production
+            // row-task fill; ctx-fill-cellwise = the old Kotlin orchestration
+            // (runBlocking + one coroutine per cell, via OldContextFill). Both
+            // fold the identical read-back, so their digests must match exactly.
+            {
+                final CNG fHeight = CNG.signature(new RNG(424242));
+                final CNG fCave = CNG.signature(new RNG(919191));
+                final CNG fRock = CNG.signature(new RNG(515151));
+                final CNG fSelB = CNG.signature(new RNG(313131));
+                final CNG fSelC = CNG.signature(new RNG(626262));
+                final CNG fSelF = CNG.signature(new RNG(737373));
+                final IrisBiome[] biomePool = new IrisBiome[8];
+                for (int i = 0; i < biomePool.length; i++) biomePool[i] = new IrisBiome();
+                final IrisBiome[] cavePool = new IrisBiome[4];
+                for (int i = 0; i < cavePool.length; i++) cavePool[i] = new IrisBiome();
+                final BlockData[] rockPool = {
+                        Material.STONE.createBlockData(), Material.DIRT.createBlockData(),
+                        Material.GRANITE.createBlockData(), Material.ANDESITE.createBlockData()};
+                final BlockData[] fluidPool = {
+                        Material.WATER.createBlockData(), Material.LAVA.createBlockData(),
+                        Material.KELP.createBlockData(), Material.SEAGRASS.createBlockData()};
+
+                // The height stream stacks 3 CNG octaves (~0.5-1us per sample,
+                // between the raw-noise kernels and the full height chain) so
+                // the orchestration delta is neither drowned out nor exaggerated.
+                final ProceduralStream<Double> hS = ProceduralStream.ofDouble((x, z) ->
+                        fHeight.noise(x, z) + fHeight.noise(x * 2, z * 2) * 0.5
+                                + fHeight.noise(x * 4, z * 4) * 0.25);
+                final ProceduralStream<BlockData> rS = ProceduralStream.of((x, z) ->
+                                rockPool[clamp((int) ((fRock.noise(x, z) * 0.5 + 0.5) * (rockPool.length - 1)), rockPool.length)],
+                        com.volmit.iris.util.stream.interpolation.Interpolated.of(t -> 0D, d -> rockPool[0]));
+                final ProceduralStream<IrisBiome> bS = ProceduralStream.of((x, z) ->
+                                biomePool[clamp((int) ((fSelB.noise(x, z) * 0.5 + 0.5) * (biomePool.length - 1)), biomePool.length)],
+                        com.volmit.iris.util.stream.interpolation.Interpolated.of(t -> 0D, d -> biomePool[0]));
+                final ProceduralStream<IrisBiome> cS = ProceduralStream.of((x, z) ->
+                                cavePool[clamp((int) ((fSelC.noise(x, z) * 0.5 + 0.5) * (cavePool.length - 1)), cavePool.length)],
+                        com.volmit.iris.util.stream.interpolation.Interpolated.of(t -> 0D, d -> cavePool[0]));
+                final ProceduralStream<BlockData> fS = ProceduralStream.of((x, z) ->
+                                fluidPool[clamp((int) ((fSelF.noise(x, z) * 0.5 + 0.5) * (fluidPool.length - 1)), fluidPool.length)],
+                        com.volmit.iris.util.stream.interpolation.Interpolated.of(t -> 0D, d -> fluidPool[0]));
+
+                final java.util.function.ToIntFunction<Object> poolIndex = v -> {
+                    for (int k = 0; k < biomePool.length; k++) if (v == biomePool[k]) return k;
+                    for (int k = 0; k < cavePool.length; k++) if (v == cavePool[k]) return 100 + k;
+                    for (int k = 0; k < rockPool.length; k++) if (v == rockPool[k]) return 300 + k;
+                    for (int k = 0; k < fluidPool.length; k++) if (v == fluidPool[k]) return 200 + k;
+                    return -1;
+                };
+
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "ctx-fill";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 2_000;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        Random r = new Random(seed);
+                        double bh = 0;
+                        for (int i = 0; i < n; i++) {
+                            int px = (r.nextInt(1 << 18) - (1 << 17)) << 4;
+                            int pz = (r.nextInt(1 << 18) - (1 << 17)) << 4;
+                            com.volmit.iris.util.context.ChunkContext ctx =
+                                    new com.volmit.iris.util.context.ChunkContext(
+                                            px, pz, hS, bS, cS, rS, fS, null, true);
+                            for (int j = 0; j < 16; j++) {
+                                for (int k = 0; k < 16; k++) {
+                                    bh += ctx.getHeight().get(k, j);
+                                    dg.add(ctx.getHeight().get(k, j));
+                                    dg.add(poolIndex.applyAsInt(ctx.getBiome().get(k, j)));
+                                    dg.add(poolIndex.applyAsInt(ctx.getCave().get(k, j)));
+                                    dg.add(poolIndex.applyAsInt(ctx.getRock().get(k, j)));
+                                    dg.add(poolIndex.applyAsInt(ctx.getFluid().get(k, j)));
+                                }
+                            }
+                        }
+                        return bh;
+                    }
+                });
+
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "ctx-fill-cellwise";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 2_000;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        Random r = new Random(seed);
+                        double bh = 0;
+                        for (int i = 0; i < n; i++) {
+                            int px = (r.nextInt(1 << 18) - (1 << 17)) << 4;
+                            int pz = (r.nextInt(1 << 18) - (1 << 17)) << 4;
+                            com.volmit.iris.util.context.ChunkedDataCache<Double> hC = new com.volmit.iris.util.context.ChunkedDataCache<>(hS, px, pz);
+                            com.volmit.iris.util.context.ChunkedDataCache<IrisBiome> bC = new com.volmit.iris.util.context.ChunkedDataCache<>(bS, px, pz);
+                            com.volmit.iris.util.context.ChunkedDataCache<IrisBiome> cC = new com.volmit.iris.util.context.ChunkedDataCache<>(cS, px, pz);
+                            com.volmit.iris.util.context.ChunkedDataCache<BlockData> rC = new com.volmit.iris.util.context.ChunkedDataCache<>(rS, px, pz);
+                            com.volmit.iris.util.context.ChunkedDataCache<BlockData> fC = new com.volmit.iris.util.context.ChunkedDataCache<>(fS, px, pz);
+                            try {
+                                OldContextFill.fill(new com.volmit.iris.util.context.ChunkedDataCache<?>[]{hC, bC, cC, rC, fC});
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                throw new RuntimeException(e);
+                            }
+                            for (int j = 0; j < 16; j++) {
+                                for (int k = 0; k < 16; k++) {
+                                    bh += hC.get(k, j);
+                                    dg.add(hC.get(k, j));
+                                    dg.add(poolIndex.applyAsInt(bC.get(k, j)));
+                                    dg.add(poolIndex.applyAsInt(cC.get(k, j)));
+                                    dg.add(poolIndex.applyAsInt(rC.get(k, j)));
+                                    dg.add(poolIndex.applyAsInt(fC.get(k, j)));
+                                }
+                            }
+                        }
+                        return bh;
+                    }
+                });
+            }
+
+            // ---- FlaggedChunk raise path (double-checked raise + chunk alloc) ----
+            // Fresh MantleChunk per op, eight distinct flags raised with counted
+            // tasks, then the already-raised skip path. Digest folds the task
+            // counter (exactly 8 per op) and the flag readback.
+            {
+                final com.volmit.iris.util.mantle.flag.MantleFlag[] flags = {
+                        com.volmit.iris.util.mantle.flag.MantleFlag.OBJECT,
+                        com.volmit.iris.util.mantle.flag.MantleFlag.UPDATE,
+                        com.volmit.iris.util.mantle.flag.MantleFlag.JIGSAW,
+                        com.volmit.iris.util.mantle.flag.MantleFlag.FEATURE,
+                        com.volmit.iris.util.mantle.flag.MantleFlag.CARVED,
+                        com.volmit.iris.util.mantle.flag.MantleFlag.FLUID_BODIES,
+                        com.volmit.iris.util.mantle.flag.MantleFlag.CLEANED,
+                        com.volmit.iris.util.mantle.flag.MantleFlag.PLANNED};
+
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "flag-raise";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 200_000;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        Random r = new Random(seed);
+                        double bh = 0;
+                        final long[] exec = new long[1];
+                        for (int i = 0; i < n; i++) {
+                            MantleChunk c = new MantleChunk(2, r.nextInt(1 << 20), r.nextInt(1 << 20));
+                            exec[0] = 0;
+                            for (int k = 0; k < flags.length; k++) {
+                                final int fk = k;
+                                c.raiseFlag(flags[fk], () -> exec[0]++);
+                            }
+                            // Already raised: task must NOT run again.
+                            c.raiseFlag(flags[0], () -> exec[0] += 100);
+                            dg.add(exec[0]);
+                            bh += exec[0];
+                            int mask = 0;
+                            for (int k = 0; k < flags.length; k++) {
+                                mask = (mask << 1) | (c.isFlagged(flags[k]) ? 1 : 0);
+                            }
+                            dg.add(mask);
+                        }
+                        return bh;
+                    }
+                });
+            }
+
+            return out;
+        }
 
     private static final java.util.concurrent.ExecutorService PARALLEL_POOL =
             java.util.concurrent.Executors.newFixedThreadPool(8);
@@ -1780,6 +1964,21 @@ public final class Benchmark {
         T get(int x, int z) {
             return data[(z * 16) + x];
         }
+    }
+
+    /**
+     * Deterministic 16x16 grid stream: get(x, z) answers grid[(z&15)*16+(x&15)]
+     * for any coordinate, so filling a production ChunkedDataCache from it
+     * reproduces exactly what the old stub prefill hook provided.
+     */
+    static <T> ProceduralStream<T> gridStream(T[] grid, T zero) {
+        return ProceduralStream.of(
+                (x, z) -> grid[(z.intValue() & 15) * 16 + (x.intValue() & 15)],
+                com.volmit.iris.util.stream.interpolation.Interpolated.of(t -> 0D, d -> zero));
+    }
+
+    static int clamp(int v, int n) {
+        return v < 0 ? 0 : Math.min(v, n - 1);
     }
 
     /** Hunk that folds every set() into the benchmark digest (y + nullness). */
