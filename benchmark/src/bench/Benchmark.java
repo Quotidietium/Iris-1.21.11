@@ -1912,7 +1912,7 @@ public final class Benchmark {
                 // execute + CountDownLatch; ctx-orch-cc = CountedCompleter
                 // children forked under one root; ctx-orch-g24 = 24 tasks of
                 // 4 rows each.
-                for (String variant : new String[]{"submit", "latch", "cc", "g24"}) {
+                for (String variant : new String[]{"submit", "latch", "cc", "g24", "g24cc"}) {
                     final String v = variant;
                     out.add(new Scenario() {
                         @Override
@@ -2327,6 +2327,39 @@ public final class Benchmark {
                     } catch (java.util.concurrent.ExecutionException e) {
                         throw new RuntimeException(e.getCause());
                     }
+                }
+            }
+            case "g24cc" -> {
+                java.util.concurrent.atomic.AtomicReference<Throwable> err = new java.util.concurrent.atomic.AtomicReference<>();
+                java.util.concurrent.CountedCompleter<Void> root = new java.util.concurrent.CountedCompleter<>() {
+                    @Override
+                    public void compute() {
+                    }
+                };
+                root.setPendingCount(caches.length * 4 - 1);
+                for (com.volmit.iris.util.context.ChunkedDataCache<?> c : caches) {
+                    for (int g = 0; g < 4; g++) {
+                        final com.volmit.iris.util.context.ChunkedDataCache<?> cc = c;
+                        final int gg = g;
+                        new java.util.concurrent.CountedCompleter<Void>(root) {
+                            @Override
+                            public void compute() {
+                                try {
+                                    for (int j = gg * 4; j < gg * 4 + 4; j++) {
+                                        cc.fillRow(j);
+                                    }
+                                } catch (Throwable t) {
+                                    err.compareAndSet(null, t);
+                                }
+                                tryComplete();
+                            }
+                        }.fork();
+                    }
+                }
+                root.invoke();
+                Throwable t = err.get();
+                if (t != null) {
+                    throw new RuntimeException(t);
                 }
             }
             default -> throw new IllegalArgumentException(variant);
