@@ -41,3 +41,4 @@ par-hyperlock-contended,8a08dbb6ddacc4f7,16
 ctx-fill,d8b5f2f2a60f5f1e,2560000
 ctx-fill-cellwise,d8b5f2f2a60f5f1e,2560000
 flag-raise,2e3649806306a025,400000
+plate-io,be0892577d353315,200

@@ -1886,6 +1886,79 @@ public final class Benchmark {
                 });
             }
 
+            // ---- Tectonic plate save/load roundtrip (Mantle IO path) ----
+            // Real TectonicPlate (64 chunks x 5 sections of ~2/3-density block
+            // matter) written through the real IOWorker (LZ4 + temp file +
+            // SYNC channel copy) and read back. The digest folds an FNV hash
+            // over the re-serialized read-back bytes plus the byte length, so
+            // on-disk format identity is proven on every op.
+            {
+                final java.io.File ioDir = new java.io.File("benchmark/results/_plateio");
+                ioDir.mkdirs();
+                final com.volmit.iris.util.mantle.io.IOWorker ioWorker =
+                        new com.volmit.iris.util.mantle.io.IOWorker(ioDir, 256);
+                final com.volmit.iris.util.mantle.TectonicPlate protoPlate =
+                        new com.volmit.iris.util.mantle.TectonicPlate(256, 7, -3);
+                final BlockData[] plateProtos = {
+                        Material.STONE.createBlockData(), Material.DIRT.createBlockData(),
+                        Material.DEEPSLATE.createBlockData(), Material.GRAVEL.createBlockData()};
+                {
+                    Random pr = new Random(4242);
+                    for (int k = 0; k < 64; k++) {
+                        com.volmit.iris.util.mantle.MantleChunk c =
+                                protoPlate.getOrCreate(pr.nextInt(32), pr.nextInt(32));
+                        for (int s = 0; s < 5; s++) {
+                            com.volmit.iris.util.matter.Matter m = c.getOrCreate(s);
+                            MatterSlice<BlockData> bs = m.slice(BlockData.class);
+                            for (int j = 0; j < 4096; j++) {
+                                if (pr.nextInt(3) > 0) {
+                                    bs.setRaw(pr.nextInt(16), pr.nextInt(16), pr.nextInt(16),
+                                            plateProtos[pr.nextInt(plateProtos.length)]);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                out.add(new Scenario() {
+                    @Override
+                    public String name() {
+                        return "plate-io";
+                    }
+
+                    @Override
+                    public int ops() {
+                        return 100;
+                    }
+
+                    @Override
+                    public double run(int n, long seed, Digest dg) {
+                        double bh = 0;
+                        for (int i = 0; i < n; i++) {
+                            try {
+                                String fname = "pv." + ((seed + i) % 8) + ".ttp.lz4b";
+                                ioWorker.write(fname, protoPlate);
+                                com.volmit.iris.util.mantle.TectonicPlate back = ioWorker.read(fname);
+                                ByteArrayOutputStream bytes = new ByteArrayOutputStream(8192);
+                                back.write(new DataOutputStream(bytes));
+                                byte[] arr = bytes.toByteArray();
+                                long fnv = 0xcbf29ce484222325L;
+                                for (byte b : arr) {
+                                    fnv ^= b;
+                                    fnv *= 0x100000001b3L;
+                                }
+                                dg.add(arr.length);
+                                dg.add(fnv);
+                                bh += arr.length;
+                            } catch (java.io.IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                        return bh;
+                    }
+                });
+            }
+
             return out;
         }
 
