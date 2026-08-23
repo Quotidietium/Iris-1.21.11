@@ -19,9 +19,10 @@
 | [round14-coroutines.md](round14-coroutines.md) | 每区块协程开销消除：引擎 4 个 Kotlin 类 Java 化——ChunkContext 1536 launch/区块→96 行任务（**4.23×**）、FlaggedChunk 256 Mutex/块→1 锁、MatterGenerator 去 runBlocking；stub 全删、golden 42 场景 |
 | [round15-fillfanout-ioaudit.md](round15-fillfanout-ioaudit.md) | 预填充扇出调参（每流任务 160.7µs vs 96 行任务 95.9µs，负结果）+ 组件复用预填充值不可行证明（context 属中心区块）+ plate-io 封口 Mantle IO（42.4ms/op，双写为崩溃持久性设计）——golden 43 场景，离线可测面收敛 |
 | [round16-hotpath-reprofiling.md](round16-hotpath-reprofiling.md) | 全面重剖析（JFR 工具化，两次剖析污染自我纠错）+ 每块分配/查找清扫：VectorMap 游标化、layer 每层单 RNG、CNG 固定元数 fit、7 站点 peek-first——layers 1.09×/-69% B、stilt 1.10×/-35% B；**R15 plate-io golden 跨进程缺口封死**（createdAt 墙钟根因）；2D 噪声实走 3D 内核记录为永久禁区 |
+| [round17-taskgranularity.md](round17-taskgranularity.md) | 饱和池形状基准确立（ctx-fill-par，8 并发区块）+ 预填充任务粒度调优：96→**24 任务/区块**（每任务 4 行）——单区块 **1.31×**、预生成预填充吞吐 **1.25×**，48/48 位级一致；g8 饱和崩塌（0.63×）复现 R15 钉死机理于粗粒度 |
 
 - 原始数据:`benchmark/results/round*.csv`(每场景 5 次测量)
-- 金样本:`benchmark/golden/golden.csv`(**43 场景**固定种子摘要,行为一致性的判定基准)
+- 金样本:`benchmark/golden/golden.csv`(**48 场景**固定种子摘要,行为一致性的判定基准)
 - 复现:`bash benchmark/build.sh && bash benchmark/run.sh <csv> 3 5 && bash benchmark/verify.sh benchmark/golden/golden.csv <csv>`
 - 隔离跑(排除 JIT 画像污染):`java -Dbench.filter=<子串> ... bench.Benchmark <csv> 3 9`(见 round9 方法论节)
 - 版本改动汇总：[../../release/3.9.3-1.20.1-1.21.11.md](../../release/3.9.3-1.20.1-1.21.11.md)
