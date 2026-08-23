@@ -87,6 +87,8 @@ public class PreservationSVC implements IrisService {
                 return 60000;
             }
         };
+        dereferencer.setName("Iris Preservation Dereferencer");
+        dereferencer.start();
     }
 
     @Override
