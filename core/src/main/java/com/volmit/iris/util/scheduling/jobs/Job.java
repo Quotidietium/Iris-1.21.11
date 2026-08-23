@@ -18,6 +18,7 @@
 
 package com.volmit.iris.util.scheduling.jobs;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.util.format.C;
 import com.volmit.iris.util.format.Form;
 import com.volmit.iris.util.plugin.VolmitSender;
@@ -46,7 +47,7 @@ public interface Job {
     }
 
     default double getProgress() {
-        return (double) getWorkCompleted() / (double) getTotalWork();
+        return getTotalWork() == 0 ? 0D : (double) getWorkCompleted() / (double) getTotalWork();
     }
 
 
@@ -72,10 +73,22 @@ public interface Job {
         }, sender.isPlayer() ? 0 : 20);
         f.whenComplete((fs, ff) -> {
             J.car(c);
-            if (!silentMsg) {
+            if (ff != null) {
+                Iris.reportError(ff);
+                ff.printStackTrace();
+                if (!silentMsg) {
+                    sender.sendMessage(C.RED + "Failed " + getName() + " after " + Form.duration(p.getMilliseconds(), 1));
+                }
+            } else if (!silentMsg) {
                 sender.sendMessage(C.AQUA + "Completed " + getName() + " in " + Form.duration(p.getMilliseconds(), 1));
             }
-            whenComplete.run();
+            try {
+                whenComplete.run();
+            } catch (Throwable e) {
+                // never let a callback failure vanish into the ignored future
+                Iris.reportError(e);
+                e.printStackTrace();
+            }
         });
     }
 }

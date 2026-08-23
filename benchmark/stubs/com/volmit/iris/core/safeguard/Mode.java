@@ -9,4 +9,11 @@ public enum Mode {
     public String getId() {
         return name().toLowerCase();
     }
+
+    public String tag(String subTag) {
+        return "[Iris]: ";
+    }
+
+    public void trySplash() {
+    }
 }
