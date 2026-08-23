@@ -116,15 +116,33 @@ public class IrisDecorator {
     }
 
     public CNG getHeightGenerator(RNG rng, IrisData data) {
+        // peek-first: these are read per column (and per candidate decorator
+        // during partOf selection); the aquire call sites allocate their
+        // capturing suppliers even on cache hits.
+        CNG cached = heightGenerator.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return heightGenerator.aquire(() ->
                 heightVariance.create(rng.nextParallelRNG(getBlockData(data).size() + stackMax + stackMin), data));
     }
 
     public CNG getGenerator(RNG rng, IrisData data) {
+        CNG cached = layerGenerator.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return layerGenerator.aquire(() -> style.create(rng.nextParallelRNG(getBlockData(data).size()), data));
     }
 
     public CNG getVarianceGenerator(RNG rng, IrisData data) {
+        CNG cached = varianceGenerator.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return varianceGenerator.aquire(() ->
                 variance.create(
                                 rng.nextParallelRNG(getBlockData(data).size()), data)
@@ -202,6 +220,11 @@ public class IrisDecorator {
     }
 
     public KList<BlockData> getBlockData(IrisData data) {
+        KList<BlockData> cached = blockData.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return blockData.aquire(() ->
         {
             KList<BlockData> blockData = new KList<>();
@@ -219,6 +242,11 @@ public class IrisDecorator {
     }
 
     public KList<BlockData> getBlockDataTops(IrisData data) {
+        KList<BlockData> cached = blockDataTops.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return blockDataTops.aquire(() ->
         {
             KList<BlockData> blockDataTops = new KList<>();

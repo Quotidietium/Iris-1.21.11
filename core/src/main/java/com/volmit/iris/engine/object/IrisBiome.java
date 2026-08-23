@@ -405,10 +405,12 @@ public class IrisBiome extends IrisRegistrant implements IRare {
 
         KList<CNG> hgens = getLayerHeightGenerators(random, rdata);
         for (int i = 0; i < layers.size(); i++) {
+            IrisBiomePaletteLayer layer = layers.get(i);
+            double zoom = layer.getZoom();
             CNG hgen = hgens.get(i);
-            double d = hgen.fit(layers.get(i).getMinHeight(), layers.get(i).getMaxHeight(), wx / layers.get(i).getZoom(), wz / layers.get(i).getZoom());
+            double d = hgen.fit(layer.getMinHeight(), layer.getMaxHeight(), wx / zoom, wz / zoom);
 
-            IrisSlopeClip sc = getLayers().get(i).getSlopeCondition();
+            IrisSlopeClip sc = layer.getSlopeCondition();
 
             if (!sc.isDefault()) {
                 if (!sc.isValid(complex.getSlopeStream().get(wx, wz))) {
@@ -420,13 +422,19 @@ public class IrisBiome extends IrisRegistrant implements IRare {
                 continue;
             }
 
+            // One RNG per layer instead of per block: nextParallelRNG does not
+            // consume from `random`, and IrisBiomePaletteLayer.get only reads
+            // the rng to (re)build its cached layer generator — which happens
+            // on the first block (j == 0) or never. RNG(sx + i) is exactly the
+            // j == 0 seed, so results are bit-identical with far less garbage.
+            RNG lrng = random.nextParallelRNG(i);
             for (int j = 0; j < d; j++) {
                 if (data.size() >= maxDepth) {
                     break;
                 }
 
                 try {
-                    data.add(getLayers().get(i).get(random.nextParallelRNG(i + j), (wx + j) / layers.get(i).getZoom(), j, (wz - j) / layers.get(i).getZoom(), rdata));
+                    data.add(layer.get(lrng, (wx + j) / zoom, j, (wz - j) / zoom, rdata));
                 } catch (Throwable e) {
                     Iris.reportError(e);
                     e.printStackTrace();
@@ -460,20 +468,25 @@ public class IrisBiome extends IrisRegistrant implements IRare {
 
         KList<CNG> hgens = getLayerHeightGenerators(random, rdata);
         for (int i = 0; i < caveCeilingLayers.size(); i++) {
+            IrisBiomePaletteLayer layer = caveCeilingLayers.get(i);
+            double zoom = layer.getZoom();
             CNG hgen = hgens.get(i);
-            double d = hgen.fit(caveCeilingLayers.get(i).getMinHeight(), caveCeilingLayers.get(i).getMaxHeight(), wx / caveCeilingLayers.get(i).getZoom(), wz / caveCeilingLayers.get(i).getZoom());
+            double d = hgen.fit(layer.getMinHeight(), layer.getMaxHeight(), wx / zoom, wz / zoom);
 
             if (d <= 0) {
                 continue;
             }
 
+            // One RNG per layer (see generateLayers): bit-identical, no
+            // per-block RNG allocation.
+            RNG lrng = random.nextParallelRNG(i);
             for (int j = 0; j < d; j++) {
                 if (data.size() >= maxDepth) {
                     break;
                 }
 
                 try {
-                    data.add(getCaveCeilingLayers().get(i).get(random.nextParallelRNG(i + j), (wx + j) / caveCeilingLayers.get(i).getZoom(), j, (wz - j) / caveCeilingLayers.get(i).getZoom(), rdata));
+                    data.add(layer.get(lrng, (wx + j) / zoom, j, (wz - j) / zoom, rdata));
                 } catch (Throwable e) {
                     Iris.reportError(e);
                     e.printStackTrace();
@@ -595,20 +608,25 @@ public class IrisBiome extends IrisRegistrant implements IRare {
 
         KList<CNG> hgens = getLayerSeaHeightGenerators(random, rdata);
         for (int i = 0; i < seaLayers.size(); i++) {
+            IrisBiomePaletteLayer layer = seaLayers.get(i);
+            double zoom = layer.getZoom();
             CNG hgen = hgens.get(i);
-            int d = hgen.fit(seaLayers.get(i).getMinHeight(), seaLayers.get(i).getMaxHeight(), wx / seaLayers.get(i).getZoom(), wz / seaLayers.get(i).getZoom());
+            int d = hgen.fit(layer.getMinHeight(), layer.getMaxHeight(), wx / zoom, wz / zoom);
 
             if (d < 0) {
                 continue;
             }
 
+            // One RNG per layer (see generateLayers): bit-identical, no
+            // per-block RNG allocation.
+            RNG lrng = random.nextParallelRNG(i);
             for (int j = 0; j < d; j++) {
                 if (data.size() >= maxDepth) {
                     break;
                 }
 
                 try {
-                    data.add(getSeaLayers().get(i).get(random.nextParallelRNG(i + j), (wx + j) / seaLayers.get(i).getZoom(), j, (wz - j) / seaLayers.get(i).getZoom(), rdata));
+                    data.add(layer.get(lrng, (wx + j) / zoom, j, (wz - j) / zoom, rdata));
                 } catch (Throwable e) {
                     Iris.reportError(e);
                     e.printStackTrace();

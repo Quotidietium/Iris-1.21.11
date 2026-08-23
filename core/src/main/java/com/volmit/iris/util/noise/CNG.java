@@ -455,6 +455,30 @@ public class CNG {
         return v.get(0);
     }
 
+    /**
+     * Fixed-arity form of {@link #fit(List, double...)} for the 3D call
+     * shape: identical results (the varargs route funnels the same three
+     * doubles into the same noise path) but no double[] allocation per call —
+     * palette picks run this per generated block.
+     */
+    public <T> T fit(List<T> v, double x, double y, double z) {
+        if (v.size() == 0) {
+            return null;
+        }
+
+        if (v.size() == 1) {
+            return v.get(0);
+        }
+
+        try {
+            return v.get(fit(0, v.size() - 1, x, y, z));
+        } catch (Throwable e) {
+            Iris.reportError(e);
+        }
+
+        return v.get(0);
+    }
+
     public int fit(int min, int max, double... dim) {
         if (min == max) {
             return min;

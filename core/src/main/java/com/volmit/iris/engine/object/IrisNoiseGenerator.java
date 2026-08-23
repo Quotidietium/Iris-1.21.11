@@ -82,6 +82,13 @@ public class IrisNoiseGenerator {
     }
 
     protected CNG getGenerator(long superSeed, IrisData data) {
+        // peek-first: called per noise sample; the aquire call site would
+        // allocate its capturing supplier (superSeed) on every cache hit.
+        CNG cached = generator.peek();
+        if (cached != null) {
+            return cached;
+        }
+
         return generator.aquire(() -> style.create(new RNG(superSeed + 33955677 - seed), data).oct(octaves));
     }
 
