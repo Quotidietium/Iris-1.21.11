@@ -35,13 +35,14 @@ import java.util.Map;
 public class LazyPregenerator extends Thread implements Listener {
     @Getter
     private static LazyPregenerator instance;
+    private static final Map<String, LazyPregenerator> generators = new HashMap<>();
     private final LazyPregenJob job;
     private final File destination;
     private final int maxPosition;
     private World world;
     private final long rate;
     private final ChronoLatch latch;
-    private static AtomicInteger lazyGeneratedChunks;
+    private final AtomicInteger lazyGeneratedChunks;
     private final AtomicInteger generatedLast;
     private final AtomicInteger lazyTotalChunks;
     private final AtomicLong startTime;
@@ -49,6 +50,12 @@ public class LazyPregenerator extends Thread implements Listener {
     private final RollingSequence chunksPerMinute;
 
     private static final Map<String, LazyPregenJob> jobs = new HashMap<>();
+    /**
+     * Set when shutdownInstance removed the job: the final run() pass must not
+     * re-write lazygen.json or the async file deletion would race with it and
+     * the file could resurrect (restarting generation on next boot).
+     */
+    private volatile boolean discardSave;
 
     public LazyPregenerator(LazyPregenJob job, File destination) {
         this.job = job;
@@ -61,10 +68,19 @@ public class LazyPregenerator extends Thread implements Listener {
         this.startTime = new AtomicLong(M.ms());
         this.chunksPerSecond = new RollingSequence(10);
         this.chunksPerMinute = new RollingSequence(10);
-        lazyGeneratedChunks = new AtomicInteger(0);
+        this.lazyGeneratedChunks = new AtomicInteger(0);
         this.generatedLast = new AtomicInteger(0);
         this.lazyTotalChunks = new AtomicInteger((int) Math.ceil(Math.pow((2.0 * job.getRadiusBlocks()) / 16, 2)));
         jobs.put(job.getWorld(), job);
+        // previously never registered: the WorldUnloadEvent handler below could
+        // not fire, so the generator thread kept running on unloaded worlds
+        LazyPregenerator prev = generators.get(job.getWorld());
+        if (prev != null && prev.isAlive()) {
+            // double-create race (lazygen.json only appears after the first save)
+            prev.interrupt();
+        }
+        generators.put(job.getWorld(), this);
+        Iris.instance.registerListener(this);
         LazyPregenerator.instance = this;
     }
 
@@ -97,18 +113,44 @@ public class LazyPregenerator extends Thread implements Listener {
     public void run() {
         while (!interrupted()) {
             J.sleep(rate);
-            tick();
+            // world gone (unloaded/removed): stop generating, keep saved state
+            if (Bukkit.getWorld(job.getWorld()) == null) {
+                Iris.info("LazyGen: world " + job.getWorld() + " is no longer loaded - stopping generator");
+                break;
+            }
+            try {
+                tick();
+            } catch (Throwable e) {
+                Iris.reportError(e);
+                e.printStackTrace();
+            }
         }
 
         try {
-            saveNow();
+            if (!discardSave) {
+                saveNow();
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
+        } finally {
+            cleanup();
         }
+    }
+
+    private void cleanup() {
+        Iris.instance.unregisterListener(this);
+        // identity remove: a replacing generator may already occupy this slot
+        generators.remove(job.getWorld(), this);
+        executorService.shutdownNow();
     }
 
     public void tick() {
         LazyPregenJob job = jobs.get(world.getName());
+        if (job == null) {
+            // job removed (shutdown command) - stop cleanly instead of NPE-ing the thread
+            interrupt();
+            return;
+        }
         if (latch.flip() && !job.paused) {
             long eta = computeETA();
             save();
@@ -238,16 +280,15 @@ public class LazyPregenerator extends Thread implements Listener {
             }
             save();
             jobs.remove(world.getName());
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    while (lazyFile.exists()){
-                        lazyFile.delete();
-                        J.sleep(1000);
-                    }
-                    Iris.info("LazyGen: " + C.IRIS + world.getName() + C.BLUE + " File deleted and instance closed.");
+            discardSave = true;
+            // async: a locked file must not park the main thread in a delete/sleep loop
+            J.a(() -> {
+                while (lazyFile.exists()) {
+                    lazyFile.delete();
+                    J.sleep(1000);
                 }
-            }.runTaskLater(Iris.instance, 20L);
+                Iris.info("LazyGen: " + C.IRIS + world.getName() + C.BLUE + " File deleted and instance closed.");
+            });
         } catch (Exception e) {
             Iris.error("Failed to shutdown Lazygen for " + world.getName());
             e.printStackTrace();

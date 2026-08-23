@@ -43,12 +43,13 @@ import java.util.stream.IntStream;
 public class TurboPregenerator extends Thread implements Listener {
     @Getter
     private static TurboPregenerator instance;
+    private static final Map<String, TurboPregenerator> generators = new HashMap<>();
     private final TurboPregenJob job;
     private final File destination;
     private final int maxPosition;
     private World world;
     private final ChronoLatch latch;
-    private static AtomicInteger turboGeneratedChunks;
+    private final AtomicInteger turboGeneratedChunks;
     private final AtomicInteger generatedLast;
     private final AtomicLong cachedLast;
     private final RollingSequence cachePerSecond;
@@ -64,6 +65,11 @@ public class TurboPregenerator extends Thread implements Listener {
     private final HyperLock hyperLock;
     private MultiBurst burst;
     private static final Map<String, TurboPregenJob> jobs = new HashMap<>();
+    /**
+     * Set when shutdownInstance removed the job: the final run() pass must not
+     * re-write turbogen.json or the async file deletion would race with it.
+     */
+    private volatile boolean discardSave;
 
     public TurboPregenerator(TurboPregenJob job, File destination) {
         this.job = job;
@@ -88,6 +94,14 @@ public class TurboPregenerator extends Thread implements Listener {
         cache = new ConcurrentHashMap<>(turboTotalChunks.get());
         this.cachinglock = new ReentrantLock();
         jobs.put(job.getWorld(), job);
+        // previously never registered: WorldUnloadEvent could not fire, so the
+        // generator thread kept running on unloaded worlds
+        TurboPregenerator prev = generators.get(job.getWorld());
+        if (prev != null && prev.isAlive()) {
+            prev.interrupt();
+        }
+        generators.put(job.getWorld(), this);
+        Iris.instance.registerListener(this);
         TurboPregenerator.instance = this;
     }
 
@@ -119,21 +133,51 @@ public class TurboPregenerator extends Thread implements Listener {
 
     public void run() {
         while (!interrupted()) {
-            tick();
+            // cap tick rate: the loop used to busy-spin at full core usage
+            // whenever the job was paused or caching
+            J.sleep(50);
+            // world gone (unloaded/removed): stop generating, keep saved state
+            if (Bukkit.getWorld(job.getWorld()) == null) {
+                Iris.info("TurboGen: world " + job.getWorld() + " is no longer loaded - stopping generator");
+                break;
+            }
+            try {
+                tick();
+            } catch (Throwable e) {
+                Iris.reportError(e);
+                e.printStackTrace();
+            }
         }
 
         try {
-            saveNow();
+            if (!discardSave) {
+                saveNow();
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
+        } finally {
+            cleanup();
         }
+    }
+
+    private void cleanup() {
+        Iris.instance.unregisterListener(this);
+        // identity remove: a replacing generator may already occupy this slot
+        generators.remove(job.getWorld(), this);
     }
 
     public void tick() {
         TurboPregenJob job = jobs.get(world.getName());
+        if (job == null) {
+            // job removed (shutdown command) - stop cleanly instead of NPE-ing the thread
+            interrupt();
+            return;
+        }
         if (!cachinglock.isLocked() && cache.isEmpty() && !caching.get()) {
-            ExecutorService cache = Executors.newFixedThreadPool(1);
-            cache.submit(this::cache);
+            // was a brand-new fixed thread pool per tick (leaked threads while
+            // the caching flag raced); MultiBurst already provides the workers
+            caching.set(true);
+            MultiBurst.burst.submit(this::cache);
         }
 
         if (latch.flip() && caching.get()) {
@@ -178,30 +222,30 @@ public class TurboPregenerator extends Thread implements Listener {
             cachinglock.lock();
             caching.set(true);
             PrecisionStopwatch p = PrecisionStopwatch.start();
-            BurstExecutor b = MultiBurst.burst.burst(turboTotalChunks.get());
-            b.setMulticore(true);
-            int[] list = IntStream.rangeClosed(0, turboTotalChunks.get()).toArray();
-            AtomicInteger order = new AtomicInteger(turboTotalChunks.get());
+            try {
+                BurstExecutor b = MultiBurst.burst.burst(turboTotalChunks.get());
+                b.setMulticore(true);
+                int[] list = IntStream.rangeClosed(0, turboTotalChunks.get()).toArray();
+                AtomicInteger order = new AtomicInteger(turboTotalChunks.get());
 
-            int threads = Runtime.getRuntime().availableProcessors();
-            if (threads > 1) threads--;
-            ExecutorService process = Executors.newFixedThreadPool(threads);
+                for (int id : list) {
+                    b.queue(() -> {
+                        cache.put(id, getChunk(id));
+                        order.addAndGet(-1);
+                    });
+                }
+                b.complete();
 
-            for (int id : list) {
-                b.queue(() -> {
-                    cache.put(id, getChunk(id));
-                    order.addAndGet(-1);
-                });
-            }
-            b.complete();
-
-            if (order.get() < 0) {
+                if (order.get() < 0) {
+                    Iris.info("Completed Caching in: " + Form.duration(p.getMilliseconds(), 2));
+                }
+            } finally {
                 cachinglock.unlock();
                 caching.set(false);
-                Iris.info("Completed Caching in: " + Form.duration(p.getMilliseconds(), 2));
             }
         } else {
             Iris.error("TurboCache is locked!");
+            caching.set(false);
         }
     }
 
@@ -302,16 +346,15 @@ public class TurboPregenerator extends Thread implements Listener {
             }
             save();
             jobs.remove(world.getName());
-            new BukkitRunnable() {
-                @Override
-                public void run() {
-                    while (turboFile.exists()) {
-                        turboFile.delete();
-                        J.sleep(1000);
-                    }
-                    Iris.info("turboGen: " + C.IRIS + world.getName() + C.BLUE + " File deleted and instance closed.");
+            discardSave = true;
+            // async: a locked file must not park the main thread in a delete/sleep loop
+            J.a(() -> {
+                while (turboFile.exists()) {
+                    turboFile.delete();
+                    J.sleep(1000);
                 }
-            }.runTaskLater(Iris.instance, 20L);
+                Iris.info("turboGen: " + C.IRIS + world.getName() + C.BLUE + " File deleted and instance closed.");
+            });
         } catch (Exception e) {
             Iris.error("Failed to shutdown turbogen for " + world.getName());
             e.printStackTrace();
