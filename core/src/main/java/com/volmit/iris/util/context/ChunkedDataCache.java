@@ -57,11 +57,20 @@ public class ChunkedDataCache<T> {
      * Sample one grid row (z-relative {@code j}) into the backing array.
      * Rows are disjoint, so this is safe to call from any thread.
      */
-    void fillRow(int j) {
+    public void fillRow(int j) {
         if (!cache) return;
         for (int i = 0; i < 16; i++) {
             data[(j << 4) + i] = stream.get((double) (x + i), (double) (z + j));
         }
+    }
+
+    /**
+     * Sample a single cell into the backing array (the unit of work the old
+     * per-cell coroutine fan-out used). Cells are disjoint across threads.
+     */
+    public void fillCell(int i, int j) {
+        if (!cache) return;
+        data[(j << 4) + i] = stream.get((double) (x + i), (double) (z + j));
     }
 
     @BlockCoordinates

@@ -79,6 +79,11 @@ public class IrisEngineMantle implements EngineMantle {
 
     @Override
     public List<Pair<List<MantleComponent>, Integer>> getComponents() {
+        // peek-first: this runs on every generateMatter (per chunk, three calls
+        // via getRadius/getRealRadius); the capturing supplier must not be
+        // allocated on the hit path (same pattern as round 13's hot getters).
+        List<Pair<List<MantleComponent>, Integer>> hit = componentsCache.peek();
+        if (hit != null) return hit;
         return componentsCache.aquire(() -> {
             var list = components.keySet()
                     .stream()
