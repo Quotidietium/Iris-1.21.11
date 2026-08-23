@@ -15,3 +15,5 @@ build.log
 benchmark/results/*.log
 benchmark/results/_*/
 benchmark/lib/*.jar
+prof18/
+*.jfr
