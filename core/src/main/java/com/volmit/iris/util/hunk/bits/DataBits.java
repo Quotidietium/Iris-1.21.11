@@ -155,6 +155,37 @@ public class DataBits {
         if (bits != newBits) {
             DataBits newData = new DataBits(newBits, size);
 
+            if (newBits > bits) {
+                // Word-streaming repack of the growth path: identical value
+                // order to the per-cell get/set loop below (source longs are
+                // consumed front-to-back, destination words filled in the same
+                // index order), but each source word is read once and each
+                // destination word stored once instead of paying Validate +
+                // cellIndex twice per cell.
+                long acc = 0;
+                int inWord = 0;
+                int outWord = 0;
+                int emitted = 0;
+                for (int w = 0; w < data.length(); w++) {
+                    long src = data.get(w);
+                    for (int k = 0; k < valuesPerLong && emitted < size; k++) {
+                        int value = (int) (src & mask);
+                        src >>>= bits;
+                        acc |= (long) value << (inWord * newBits);
+                        emitted++;
+                        if (++inWord == newData.valuesPerLong) {
+                            newData.data.set(outWord++, acc);
+                            acc = 0;
+                            inWord = 0;
+                        }
+                    }
+                }
+                if (inWord > 0) {
+                    newData.data.set(outWord, acc);
+                }
+                return newData;
+            }
+
             for (int i = 0; i < size; i++) {
                 newData.set(i, get(i));
             }

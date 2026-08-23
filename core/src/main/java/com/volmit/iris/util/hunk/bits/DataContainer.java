@@ -24,7 +24,6 @@ import it.unimi.dsi.fastutil.ints.*;
 import java.io.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 public class DataContainer<T> {
     private static final boolean TRIM = Boolean.getBoolean("iris.trim-palette");
     protected static final int INITIAL_BITS = 3;
@@ -37,7 +36,19 @@ public class DataContainer<T> {
     protected static final int LINEAR_BITS_LIMIT = 2;
     protected static final int LINEAR_INITIAL_LENGTH = (int) Math.pow(2, LINEAR_BITS_LIMIT) + 2;
     protected static final int[] BIT = computeBitLimits();
-    private final Lock read, write;
+    private final Lock write;
+
+    /**
+     * Structural sequence number for lock-free {@link #get(int)}. Odd means a
+     * (data, palette) swap is in progress. Writers bump it around the only two
+     * places that reassign both fields (both under the write lock, both always
+     * installing fresh objects); readers snapshot the field pair between two
+     * version reads and retry when a swap interleaved. Cell writes need no
+     * fence: they are per-long volatile (AtomicLongArray) and palette ids are
+     * append-only, with the id's palette entry published before the cell via
+     * the writer's program order.
+     */
+    private volatile int structureVersion;
 
     private volatile Palette<T> palette;
     private volatile DataBits data;
@@ -45,9 +56,7 @@ public class DataContainer<T> {
     private final Writable<T> writer;
 
     public DataContainer(Writable<T> writer, int length) {
-        var lock = new ReentrantReadWriteLock();
-        this.read = lock.readLock();
-        this.write = lock.writeLock();
+        this.write = new ReentrantReadWriteLock().writeLock();
 
         this.writer = writer;
         this.length = length;
@@ -56,9 +65,7 @@ public class DataContainer<T> {
     }
 
     public DataContainer(DataInputStream din, Writable<T> writer) throws IOException {
-        var lock = new ReentrantReadWriteLock();
-        this.read = lock.readLock();
-        this.write = lock.writeLock();
+        this.write = new ReentrantReadWriteLock().writeLock();
 
         this.writer = writer;
         this.length = Varint.readUnsignedVarInt(din);
@@ -157,25 +164,36 @@ public class DataContainer<T> {
         if (bits == data.getBits())
             return;
 
-        if (data.getBits() <= LINEAR_BITS_LIMIT != bits <= LINEAR_BITS_LIMIT) {
-            palette = newPalette(bits).from(palette);
-        }
+        structureVersion++;
+        try {
+            if (data.getBits() <= LINEAR_BITS_LIMIT != bits <= LINEAR_BITS_LIMIT) {
+                palette = newPalette(bits).from(palette);
+            }
 
-        data = data.setBits(bits);
+            data = data.setBits(bits);
+        } finally {
+            structureVersion++;
+        }
     }
 
     public T get(int position) {
-        read.lock();
-        try {
-            int id = data.get(position);
-
-            if (id <= 0) {
-                return null;
+        // Lock-free seqlock read: see structureVersion javadoc. The old
+        // read-lock/unlock pair cost more than the lookup itself (AQLS
+        // signalNext alone showed up to ~30% of carve-modify samples).
+        for (; ; ) {
+            int v = structureVersion;
+            if ((v & 1) != 0) {
+                continue;
             }
 
-            return palette.get(id);
-        } finally {
-            read.unlock();
+            DataBits d = data;
+            Palette<T> p = palette;
+            int id = d.get(position);
+            T value = id <= 0 ? null : p.get(id);
+
+            if (structureVersion == v) {
+                return value;
+            }
         }
     }
 
@@ -212,7 +230,12 @@ public class DataContainer<T> {
             tBits.set(i, x <= 0 || x > paletteSize ? 0 : remap[x]);
         }
 
-        data = tBits;
-        palette = trimmed;
+        structureVersion++;
+        try {
+            data = tBits;
+            palette = trimmed;
+        } finally {
+            structureVersion++;
+        }
     }
 }
