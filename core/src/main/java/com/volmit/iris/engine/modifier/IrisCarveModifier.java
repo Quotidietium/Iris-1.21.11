@@ -34,7 +34,9 @@ import com.volmit.iris.util.mantle.Mantle;
 import com.volmit.iris.util.mantle.MantleChunk;
 import com.volmit.iris.util.math.M;
 import com.volmit.iris.util.math.RNG;
+import com.volmit.iris.util.matter.Matter;
 import com.volmit.iris.util.matter.MatterCavern;
+import com.volmit.iris.util.matter.MatterSlice;
 import com.volmit.iris.util.matter.slices.MarkerMatter;
 import com.volmit.iris.util.scheduling.PrecisionStopwatch;
 import lombok.Data;
@@ -73,6 +75,12 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
         final int[] touched = new int[1];
         // Loop-invariant bounds (world config cannot change mid-chunk).
         final int worldTop = getEngine().getWorld().maxHeight() - getEngine().getWorld().minHeight();
+        // Neighbor probes below hit the same y-section for runs of cells (and
+        // MantleChunk.iterate walks one section at a time); memoizing the
+        // (section -> MatterCavern slice) pair turns each probe's section read
+        // + slice map lookup into a compare. Per-onModify state: onModify is
+        // single-threaded per chunk.
+        final CavernMemo memo = new CavernMemo();
         Consumer4<Integer, Integer, Integer, MatterCavern> iterator = (xx, yy, zz, c) -> {
             if (c == null) {
                 return;
@@ -107,19 +115,19 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
 
             //todo: Fix chunk decoration not working on chunk's border
 
-            if (rz < 15 && mc.get(xx, yy, zz + 1, MatterCavern.class) == null) {
+            if (rz < 15 && cavernAt(mc, memo, xx, yy, zz + 1) == null) {
                 walls.put(new IrisPosition(rx, yy, rz + 1), c);
             }
 
-            if (rx < 15 && mc.get(xx + 1, yy, zz, MatterCavern.class) == null) {
+            if (rx < 15 && cavernAt(mc, memo, xx + 1, yy, zz) == null) {
                 walls.put(new IrisPosition(rx + 1, yy, rz), c);
             }
 
-            if (rz > 0 && mc.get(xx, yy, zz - 1, MatterCavern.class) == null) {
+            if (rz > 0 && cavernAt(mc, memo, xx, yy, zz - 1) == null) {
                 walls.put(new IrisPosition(rx, yy, rz - 1), c);
             }
 
-            if (rx > 0 && mc.get(xx - 1, yy, zz, MatterCavern.class) == null) {
+            if (rx > 0 && cavernAt(mc, memo, xx - 1, yy, zz) == null) {
                 walls.put(new IrisPosition(rx - 1, yy, rz), c);
             }
 
@@ -200,6 +208,23 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
 
         getEngine().getMetrics().getDeposit().put(p.getMilliseconds());
         mc.release();
+    }
+
+    /** Per-onModify memo for the neighbor cavern probes (see onModify). */
+    private static final class CavernMemo {
+        int section = -1;
+        MatterSlice<MatterCavern> slice;
+    }
+
+    private static MatterCavern cavernAt(MantleChunk mc, CavernMemo memo, int x, int y, int z) {
+        int section = y >> 4;
+        if (memo.section != section) {
+            Matter matter = mc.get(section);
+            memo.slice = matter == null ? null : matter.getSlice(MatterCavern.class);
+            memo.section = section;
+        }
+        MatterSlice<MatterCavern> slice = memo.slice;
+        return slice == null ? null : slice.get(x & 15, y & 15, z & 15);
     }
 
     private void processZone(Hunk<BlockData> output, MantleChunk mc, Mantle mantle, CaveZone zone, int rx, int rz, int xx, int zz) {

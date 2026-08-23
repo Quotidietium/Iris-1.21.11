@@ -175,7 +175,13 @@ public class MantleChunk extends FlaggedChunk {
             return null;
         }
 
-        return (T) matter.slice(type).get(x & 15, y & 15, z & 15);
+        // Same all-null semantics for a missing slice: slice(type) would create
+        // (and insert) an empty MatterSlice on the first read of a section that
+        // has matter but not this slice type. An empty slice reads identical
+        // (null) to no slice, so skipping the materialization changes no read
+        // result and removes per-read map mutations from lookup paths.
+        MatterSlice<T> slice = matter.getSlice(type);
+        return slice == null ? null : slice.get(x & 15, y & 15, z & 15);
     }
 
     /**
