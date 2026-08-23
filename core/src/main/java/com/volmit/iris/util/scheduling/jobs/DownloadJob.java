@@ -18,6 +18,7 @@
 
 package com.volmit.iris.util.scheduling.jobs;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.util.network.DL;
 import com.volmit.iris.util.network.DownloadMonitor;
 
@@ -61,10 +62,14 @@ public class DownloadJob implements Job {
                 download.downloadChunk();
             }
         } catch (IOException e) {
+            Iris.reportError(e);
             e.printStackTrace();
+            download.fail();
         }
 
-        cw = tw;
+        if (download.isState(DL.DownloadState.COMPLETE)) {
+            cw = tw;
+        }
     }
 
     @Override

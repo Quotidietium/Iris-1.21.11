@@ -23,6 +23,7 @@ import com.volmit.iris.util.io.IO;
 import com.volmit.iris.util.scheduling.ChronoLatch;
 
 import java.io.*;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Arrays;
@@ -87,6 +88,27 @@ public abstract class DL {
         update();
     }
 
+    /**
+     * Abort an in-flight download: closes streams and marks the state FAILED.
+     */
+    public void fail() {
+        if (isState(DownloadState.DOWNLOADING) || isState(DownloadState.STARTING)) {
+            try {
+                closeStream();
+            } catch (IOException ignored) {
+
+            }
+            try {
+                if (o != null) {
+                    o.close();
+                }
+            } catch (IOException ignored) {
+
+            }
+            state(DownloadState.FAILED);
+        }
+    }
+
     public int getBufferSize() {
         return bufferSize;
     }
@@ -98,16 +120,30 @@ public abstract class DL {
 
         state(DownloadState.STARTING);
 
-        if (hasFlag(DownloadFlag.CALCULATE_SIZE)) {
-            size = calculateSize();
+        try {
+            if (hasFlag(DownloadFlag.CALCULATE_SIZE)) {
+                size = calculateSize();
+            }
+
+            o = new MeteredOutputStream(new FileOutputStream(d), 100);
+            openStream();
+        } catch (IOException e) {
+            if (o != null) {
+                try {
+                    o.close();
+                } catch (IOException ignored) {
+
+                }
+                o = null;
+            }
+            state(DownloadState.FAILED);
+            throw e;
         }
 
         start = System.currentTimeMillis();
         downloaded = 0;
         bps = 0;
         lastChunk = System.currentTimeMillis();
-        o = new MeteredOutputStream(new FileOutputStream(d), 100);
-        openStream();
         state(DownloadState.DOWNLOADING);
     }
 
@@ -125,7 +161,8 @@ public abstract class DL {
         long d = download();
         lastPull = d;
 
-        if (d < 0) {
+        // IO.transfer never returns negative; a zero-byte chunk means the stream hit EOF
+        if (d <= 0) {
             finishDownload();
             return;
         }
@@ -134,7 +171,7 @@ public abstract class DL {
         currentChunk += d;
 
         double chunkTime = (double) (System.currentTimeMillis() - lastChunk) / 1000D;
-        bps = (long) ((double) currentChunk / chunkTime);
+        bps = chunkTime <= 0 ? currentChunk * 1000L : (long) ((double) currentChunk / chunkTime);
 
         if (latch.flip()) {
             update();
@@ -146,12 +183,16 @@ public abstract class DL {
     }
 
     private void finishDownload() throws IOException {
-        if (!isState(DownloadState.NEW)) {
+        if (!isState(DownloadState.DOWNLOADING)) {
             throw new DownloadException("Cannot finish download while " + state.toString());
         }
 
-        closeStream();
-        o.close();
+        try {
+            closeStream();
+        } finally {
+            o.close();
+        }
+
         state(DownloadState.COMPLETE);
     }
 
@@ -192,7 +233,13 @@ public abstract class DL {
         c.setConnectTimeout(timeout);
         c.setReadTimeout(timeout);
         c.connect();
-        return c.getContentLengthLong();
+        try {
+            return c.getContentLengthLong();
+        } finally {
+            if (c instanceof HttpURLConnection) {
+                ((HttpURLConnection) c).disconnect();
+            }
+        }
     }
 
     public enum DownloadFlag {
