@@ -111,7 +111,13 @@ public class IrisPack {
     public static Future<IrisPack> from(VolmitSender sender, IrisPackRepository repo) throws MalformedURLException {
         CompletableFuture<IrisPack> pack = new CompletableFuture<>();
         repo.install(sender, () -> {
-            pack.complete(new IrisPack(repo.getRepo()));
+            try {
+                pack.complete(new IrisPack(repo.getRepo()));
+            } catch (Throwable e) {
+                Iris.reportError(e);
+                // never leave the future pending: callers would wait forever
+                pack.completeExceptionally(e);
+            }
         });
         return pack;
     }
@@ -124,6 +130,12 @@ public class IrisPack {
      * @throws IrisException if the pack already exists or another error
      */
     public static IrisPack blank(String name) throws IrisException {
+        // The name becomes both a folder name and dimension id; reject anything
+        // that could escape the packs folder or inject into the dimension json
+        if (name == null || !name.matches("[a-zA-Z0-9_-]+")) {
+            throw new IrisException("Invalid pack name '" + name + "': only letters, numbers, - and _ are allowed");
+        }
+
         File f = packsPack(name);
 
         if (f.exists()) {
@@ -132,11 +144,11 @@ public class IrisPack {
 
         File fd = new File(f, "dimensions/" + name + ".json");
         fd.getParentFile().mkdirs();
+        JSONObject dimension = new JSONObject();
+        dimension.put("name", Form.capitalize(name));
+        dimension.put("version", 1);
         try {
-            IO.writeAll(fd, "{\n" +
-                    "    \"name\": \"" + Form.capitalize(name) + "\",\n" +
-                    "    \"version\": 1\n" +
-                    "}\n");
+            IO.writeAll(fd, dimension.toString(4) + "\n");
         } catch (IOException e) {
             throw new IrisException(e.getMessage(), e);
         }

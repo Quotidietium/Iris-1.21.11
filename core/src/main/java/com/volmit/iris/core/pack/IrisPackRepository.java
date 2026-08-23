@@ -57,26 +57,39 @@ public class IrisPackRepository {
         // https://github.com/IrisDimensions/overworld
         if (g.startsWith("https://github.com/")) {
             String sub = g.split("\\Qgithub.com/\\E")[1];
+            String[] parts = sub.split("\\Q/\\E");
+
+            if (parts.length < 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
+                return null;
+            }
+
             IrisPackRepository r = IrisPackRepository.builder()
-                    .user(sub.split("\\Q/\\E")[0])
-                    .repo(sub.split("\\Q/\\E")[1]).build();
+                    .user(parts[0])
+                    .repo(parts[1]).build();
 
             if (g.contains("/tree/")) {
-                r.setBranch(g.split("/tree/")[1]);
+                String[] tree = g.split("/tree/");
+                if (tree.length > 1 && !tree[1].trim().isEmpty()) {
+                    r.setBranch(tree[1]);
+                }
             }
 
             return r;
         } else if (g.contains("/")) {
             String[] f = g.split("\\Q/\\E");
 
-            if (f.length == 1) {
-                return from(g);
-            } else if (f.length == 2) {
+            if (f.length == 2) {
+                if (f[0].isEmpty() || f[1].isEmpty()) {
+                    return null;
+                }
                 return IrisPackRepository.builder()
                         .user(f[0])
                         .repo(f[1])
                         .build();
             } else if (f.length >= 3) {
+                if (f[0].isEmpty() || f[1].isEmpty() || f[2].isEmpty()) {
+                    return null;
+                }
                 IrisPackRepository r = IrisPackRepository.builder()
                         .user(f[0])
                         .repo(f[1])
@@ -89,16 +102,21 @@ public class IrisPackRepository {
                 }
 
                 return r;
+            } else {
+                // e.g. "a/" -> split yields a single element; recursing with the same
+                // input would stack-overflow, so treat it as unparseable
+                return null;
             }
         } else {
+            if (g.trim().isEmpty()) {
+                return null;
+            }
             return IrisPackRepository.builder()
                     .user("IrisDimensions")
                     .repo(g)
                     .branch(g.equals("overworld") ? "stable" : "master")
                     .build();
         }
-
-        return null;
     }
 
     public String toURL() {
@@ -116,17 +134,25 @@ public class IrisPackRepository {
             File dl = new File(Iris.getTemp(), "dltk-" + UUID.randomUUID() + ".zip");
             File work = new File(Iris.getTemp(), "extk-" + UUID.randomUUID());
             new JobCollection(Form.capitalize(getRepo()),
-                    new DownloadJob(toURL(), pack),
+                    new DownloadJob(toURL(), dl),
                     new SingleJob("Extracting", () -> ZipUtil.unpack(dl, work)),
                     new SingleJob("Installing", () -> {
+                        File[] extracted = work.listFiles();
+                        if (extracted == null || extracted.length == 0) {
+                            throw new RuntimeException("Extracted pack is empty: " + work.getPath());
+                        }
+                        pack.mkdirs();
                         try {
-                            FileUtils.copyDirectory(work.listFiles()[0], pack);
+                            FileUtils.copyDirectory(extracted[0], pack);
                         } catch (IOException e) {
-                            e.printStackTrace();
+                            throw new RuntimeException("Failed to install pack into " + pack.getPath(), e);
                         }
                     })).execute(sender, whenComplete);
         } else {
             sender.sendMessage("Pack already exists!");
+            // The pack is present, so treat this as success; skipping the callback
+            // would leave futures from IrisPack.from() pending forever
+            whenComplete.run();
         }
     }
 }
