@@ -10,8 +10,8 @@
 | `build.sh` | 用 javac 将 **真实 core 源码**（除 14 个离线不可编译的第三方集成类）+ 少量 stub + 本目录 harness 一起编译。**兼作全量编译校验** |
 | `run.sh <csv> [warmup] [iters]` | 运行基准（默认 3 次预热 + 5 次测量），输出 CSV |
 | `verify.sh <a.csv> <b.csv>` | 比对两份 CSV 第 0 轮（固定种子 900000）的 digest，必须完全一致 |
-| `stubs/` | 仅遮蔽无法独立编译的类：插件引导（Iris，`initialize` 为 classpath 扫描实现）、Kotlin 类（ChunkContext/FlaggedChunk/MatterGenerator/脚本环境等）、离线不可得的第三方 API（paralithic/MultiverseCore 等）、`org.bukkit.Bukkit`（`createBlockData` 返回 JDK 动态代理 BlockData——解锁 Matter/Mantle 存储层的离线测量）。stub 的默认值与真实代码一致 |
-| `src/bench/Benchmark.java` | 31 个场景：CNG 噪声 2D/3D/断裂链/Perlin、fit 选择、IRare 生物群系挑选（现代/legacy）、implode 稀有度（重建/缓存）、2D 插值×3、3D 插值×2、WorldCache2D（全 miss/命中）、逐列 RNG、地形列填充（legacy/新路径，真实 IrisBiome/Region/Dimension）、并行×3（8 线程共享 CNG/共享缓存散点/raster）、Matter/Mantle 存储层×4（DataContainer set/get、MantleChunk 写链、16³ Matter 序列化往返）、HyperLock×2（单线程命中、8 线程同键争用）、对象放置×2（IrisObject.place 主循环/STILT 循环，真实 IrisObject+IrisObjectPlacement+记录型 placer） |
+| `stubs/` | 仅遮蔽无法独立编译的类：插件引导（Iris，`initialize` 为 classpath 扫描实现）、离线不可得的第三方 API（paralithic/MultiverseCore 等）、`org.bukkit.Bukkit`（`createBlockData` 返回 JDK 动态代理 BlockData——解锁 Matter/Mantle 存储层的离线测量）。第 14 轮起引擎的 ChunkContext/ChunkedDataCache/FlaggedChunk/MatterGenerator 已 Java 化，**真实实现直接参与编译与测量**（stub 已删）。stub 的默认值与真实代码一致 |
+| `src/bench/Benchmark.java` | 42 个场景：CNG 噪声 2D/3D/断裂链/Perlin、fit 选择、IRare 生物群系挑选（现代/legacy）、implode 稀有度（重建/缓存）、2D 插值×3、3D 插值×2、WorldCache2D（全 miss/命中）、逐列 RNG、地形列填充（legacy/新路径，真实 IrisBiome/Region/Dimension）、并行×3（8 线程共享 CNG/共享缓存散点/raster）、Matter/Mantle 存储层×4（DataContainer set/get、MantleChunk 写链、16³ Matter 序列化往返）、HyperLock×2（单线程命中、8 线程同键争用）、对象放置×2（IrisObject.place 主循环/STILT 循环，真实 IrisObject+IrisObjectPlacement+记录型 placer）、装饰器×2、沉积、洞穴雕刻×2、后处理、群系高度、铺层、**区块上下文预填充×2（新行任务路径 vs 旧协程编排复刻 `OldContextFill`——真实 kotlinx-coroutines）**、标志位提升 |
 | `src/bench/Verify3D.java` | 3D 适配器 vs 原 lambda 链的 60 万采样 A/B 等价性证明 |
 | `results/` | 各轮原始 CSV（提交进库） |
 | `golden/` | 金样本摘要快照（it=0 digest） |

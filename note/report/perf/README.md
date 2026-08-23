@@ -16,9 +16,10 @@
 | [round11-carve.md](round11-carve.md) | 洞穴雕刻双向：IrisMatter.slice 捕获 lambda 消除（JFR 57% 权重，外溢惠及沉积 -56.6%）+ CarveModifier 列数组/首触序重建 + 形状栅格 pow 备忘——carve 读 **1.07× / -64.4% 分配** |
 | [round12-postperfection.md](round12-postperfection.md) | 后处理阶段：Perfection 多核竞态修复（burst.complete 缺失 + 共享列表）+ Post 不变量提升——时间持平，正确性收益；负优化（扫描融合）鉴别并回退 |
 | [round13-heightlayers.md](round13-heightlayers.md) | 高度采样与铺层：AtomicCache.peek() 命中路径加固（98 处 aquire-lambda 模式清扫热链）+ 层循环提升——持平（EA 已消除小链路分配；对内联退化画像免疫），覆盖封口 39 场景 |
+| [round14-coroutines.md](round14-coroutines.md) | 每区块协程开销消除：引擎 4 个 Kotlin 类 Java 化——ChunkContext 1536 launch/区块→96 行任务（**4.23×**）、FlaggedChunk 256 Mutex/块→1 锁、MatterGenerator 去 runBlocking；stub 全删、golden 42 场景 |
 
 - 原始数据:`benchmark/results/round*.csv`(每场景 5 次测量)
-- 金样本:`benchmark/golden/golden.csv`(**39 场景**固定种子摘要,行为一致性的判定基准)
+- 金样本:`benchmark/golden/golden.csv`(**42 场景**固定种子摘要,行为一致性的判定基准)
 - 复现:`bash benchmark/build.sh && bash benchmark/run.sh <csv> 3 5 && bash benchmark/verify.sh benchmark/golden/golden.csv <csv>`
 - 隔离跑(排除 JIT 画像污染):`java -Dbench.filter=<子串> ... bench.Benchmark <csv> 3 9`(见 round9 方法论节)
 - 版本改动汇总：[../../release/3.9.3-1.20.1-1.21.11.md](../../release/3.9.3-1.20.1-1.21.11.md)
