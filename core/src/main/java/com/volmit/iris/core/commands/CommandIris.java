@@ -64,7 +64,7 @@ public class CommandIris implements DecreeExecutor {
     private CommandEdit edit;
     private CommandFind find;
     private CommandDeveloper developer;
-    public static boolean worldCreation = false;
+    public static volatile boolean worldCreation = false;
     private static final AtomicReference<Thread> mainWorld = new AtomicReference<>();
     String WorldEngine;
     String worldNameToCheck = "YourWorldName";
@@ -90,6 +90,11 @@ public class CommandIris implements DecreeExecutor {
         if (name.equalsIgnoreCase("benchmark")) {
             sender().sendMessage(C.RED + "You cannot use the world name \"benchmark\" for creating worlds as Iris uses this directory for Benchmarking Packs.");
             sender().sendMessage(C.RED + "May we suggest the name \"IrisWorld\" instead?");
+            return;
+        }
+
+        if (!name.matches("[a-zA-Z0-9_.-]+") || name.contains("..")) {
+            sender().sendMessage(C.RED + "World names may only contain letters, numbers, '.', '_' and '-' (no path separators).");
             return;
         }
 
@@ -307,6 +312,10 @@ public class CommandIris implements DecreeExecutor {
     public static boolean deleteDirectory(File dir) {
         if (dir.isDirectory()) {
             File[] children = dir.listFiles();
+            if (children == null) {
+                // IO error or access denied (e.g. locked file on Windows)
+                return false;
+            }
             for (int i = 0; i < children.length; i++) {
                 boolean success = deleteDirectory(children[i]);
                 if (!success) {
@@ -382,9 +391,9 @@ public class CommandIris implements DecreeExecutor {
             boolean overwrite
     ) {
         boolean trim = false;
-        sender().sendMessage(C.GREEN + "Downloading pack: " + pack + "/" + branch + (trim ? " trimmed" : "") + (overwrite ? " overwriting" : "") + " (async)");
-        // Downloads block on network IO; run off the main thread so a slow/hung
-        // GitHub request cannot freeze the whole server
+        sender().sendMessage(C.GREEN + "Downloading pack: " + pack + "/" + branch + (trim ? " trimmed" : "") + (overwrite ? " overwriting" : ""));
+        // Downloads block on network IO; keep it off the scheduler thread even if a
+        // future caller invokes this method synchronously from the main thread
         J.a(() -> {
             if (pack.equals("overworld")) {
                 String url = "https://github.com/IrisDimensions/overworld/releases/download/" + INMS.OVERWORLD_TAG + "/overworld.zip";
@@ -473,6 +482,11 @@ public class CommandIris implements DecreeExecutor {
             @Param(description = "The name of the world to load")
             String world
     ) {
+        if (world == null || !world.matches("[a-zA-Z0-9_.-]+") || world.contains("..")) {
+            sender().sendMessage(C.RED + "Invalid world name.");
+            return;
+        }
+
         World worldloaded = Bukkit.getWorld(world);
         worldNameToCheck = world;
         boolean worldExists = doesWorldExist(worldNameToCheck);
@@ -504,6 +518,12 @@ public class CommandIris implements DecreeExecutor {
             sender().sendMessage(C.GOLD + world + " is not an iris world.");
             return;
         }
+
+        if (dimension == null) {
+            sender().sendMessage(C.RED + "No dimension json found in " + world + "/iris/pack/dimensions - refusing to register a broken generator in bukkit.yml");
+            return;
+        }
+
         sender().sendMessage(C.GREEN + "Loading world: " + world);
 
         YamlConfiguration yml = YamlConfiguration.loadConfiguration(BUKKIT_YML);

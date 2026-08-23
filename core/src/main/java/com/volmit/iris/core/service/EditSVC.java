@@ -33,7 +33,7 @@ import org.bukkit.event.world.WorldUnloadEvent;
 
 public class EditSVC implements IrisService {
     private KMap<World, BlockEditor> editors;
-    public static boolean deletingWorld = false;
+    public static volatile boolean deletingWorld = false;
 
     @Override
     public void onEnable() {
