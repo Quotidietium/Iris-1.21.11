@@ -130,9 +130,17 @@ public final class Benchmark {
 
         try (PrintWriter w = new PrintWriter(out, "UTF-8")) {
             w.println("scenario,iteration,seed,ops,ns_per_op,bytes_per_op,digest,samples");
+            // Substring match as before; a leading '=' switches to exact-name
+            // matching so scenarios whose names contain each other (ctx-fill
+            // vs ctx-fill-cellwise, object-place vs object-place-stilt) can be
+            // profiled/verified in isolation.
             String filter = System.getProperty("bench.filter", "");
+            boolean exact = filter.startsWith("=");
+            if (exact) {
+                filter = filter.substring(1);
+            }
             for (Scenario s : scenarios) {
-                if (!filter.isEmpty() && !s.name().contains(filter)) {
+                if (!filter.isEmpty() && (exact ? !s.name().equals(filter) : !s.name().contains(filter))) {
                     continue;
                 }
                 for (int i = 0; i < warmups; i++) {
@@ -1902,11 +1910,21 @@ public final class Benchmark {
                 final BlockData[] plateProtos = {
                         Material.STONE.createBlockData(), Material.DIRT.createBlockData(),
                         Material.DEEPSLATE.createBlockData(), Material.GRAVEL.createBlockData()};
+                final int[][] plateCoords;
                 {
                     Random pr = new Random(4242);
+                    // First-occurrence chunk coordinates, replayed to address
+                    // the read-back plate (TectonicPlate.get is coordinate-keyed).
+                    java.util.List<int[]> coords = new java.util.ArrayList<>();
+                    java.util.Set<Long> seen = new java.util.HashSet<>();
                     for (int k = 0; k < 64; k++) {
+                        int cx = pr.nextInt(32), cz = pr.nextInt(32);
+                        long key = (long) cx << 32 | (cz & 0xffffffffL);
+                        if (seen.add(key)) {
+                            coords.add(new int[]{cx, cz});
+                        }
                         com.volmit.iris.util.mantle.MantleChunk c =
-                                protoPlate.getOrCreate(pr.nextInt(32), pr.nextInt(32));
+                                protoPlate.getOrCreate(cx, cz);
                         for (int s = 0; s < 5; s++) {
                             com.volmit.iris.util.matter.Matter m = c.getOrCreate(s);
                             MatterSlice<BlockData> bs = m.slice(BlockData.class);
@@ -1918,6 +1936,8 @@ public final class Benchmark {
                             }
                         }
                     }
+                    final int[][] coordsArr = coords.toArray(new int[0][]);
+                    plateCoords = coordsArr;
                 }
 
                 out.add(new Scenario() {
@@ -1939,17 +1959,49 @@ public final class Benchmark {
                                 String fname = "pv." + ((seed + i) % 8) + ".ttp.lz4b";
                                 ioWorker.write(fname, protoPlate);
                                 com.volmit.iris.util.mantle.TectonicPlate back = ioWorker.read(fname);
-                                ByteArrayOutputStream bytes = new ByteArrayOutputStream(8192);
-                                back.write(new DataOutputStream(bytes));
-                                byte[] arr = bytes.toByteArray();
-                                long fnv = 0xcbf29ce484222325L;
-                                for (byte b : arr) {
-                                    fnv ^= b;
-                                    fnv *= 0x100000001b3L;
+                                // Order-independent content proof. Whole-plate
+                                // writeDos bytes vary ACROSS PROCESSES:
+                                // Matter.writeDos serializes slices in
+                                // getSliceTypes() order (a HashMap keyed by
+                                // Class<?>, whose identity hash differs per
+                                // JVM). Every section of this plate holds
+                                // exactly one slice, so per-section writeDos
+                                // bytes are process-stable; fold the sorted
+                                // per-section FNVs instead (round 16 closed a
+                                // round-15 gap where the whole-plate digest was
+                                // wrongly assumed cross-process stable).
+                                long[] sectionHashes = new long[plateCoords.length * 5];
+                                int sh = 0;
+                                for (int[] c : plateCoords) {
+                                    com.volmit.iris.util.mantle.MantleChunk ch = back.get(c[0], c[1]);
+                                    for (int s = 0; s < 5; s++) {
+                                        com.volmit.iris.util.matter.Matter m = ch == null ? null : ch.get(s);
+                                        if (m == null) {
+                                            sectionHashes[sh++] = 0L;
+                                            continue;
+                                        }
+                                        // createdAt is a wall-clock stamp baked into
+                                        // every section header (MatterHeader defaults to
+                                        // M.ms()), so raw section bytes can never match
+                                        // across processes — pin it on this read-back
+                                        // copy before hashing.
+                                        m.getHeader().setCreatedAt(0L);
+                                        ByteArrayOutputStream sb = new ByteArrayOutputStream(1024);
+                                        m.writeDos(new DataOutputStream(sb));
+                                        byte[] sa = sb.toByteArray();
+                                        long fnv = 0xcbf29ce484222325L;
+                                        for (byte b : sa) {
+                                            fnv ^= b;
+                                            fnv *= 0x100000001b3L;
+                                        }
+                                        sectionHashes[sh++] = fnv ^ sa.length;
+                                    }
                                 }
-                                dg.add(arr.length);
-                                dg.add(fnv);
-                                bh += arr.length;
+                                java.util.Arrays.sort(sectionHashes);
+                                for (long h : sectionHashes) {
+                                    dg.add(h);
+                                }
+                                bh += sectionHashes.length;
                             } catch (java.io.IOException e) {
                                 throw new RuntimeException(e);
                             }
