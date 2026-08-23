@@ -74,20 +74,40 @@ public class ChunkContext {
         fillAll();
     }
 
+    /**
+     * Rows per fill task (4 = 24 tasks per chunk, 4 per stream). The height
+     * stream dominates the work; splitting it across 4 tasks keeps its
+     * critical path at 4 rows while cutting task/queue churn 4x. Measured
+     * (round 17): 1.31x single-chunk, 1.26x under 8-way saturated pregen
+     * shape; 8 rows/task collapses under saturation (0.63x - height
+     * stragglers) and 1 row/task pays 4x the submission churn. Grids are
+     * identical for every grouping (cells are pure functions of stream +
+     * coordinates) - only scheduling changes. Override with
+     * {@code iris.ctx.rows-per-task}.
+     */
+    private static final int ROWS_PER_TASK = Math.max(1, Math.min(16,
+            Integer.getInteger("iris.ctx.rows-per-task", 4)));
+
     private void fillAll() {
-        // One task per (stream, row): 96 executor submissions replace the old
-        // 1536 coroutine launches while keeping the cold-cache fan-out (a
-        // per-stream task would serialize the heavy height stream on one
-        // thread: measured 160.7us vs 95.9us on the ctx-fill scenario).
+        // Row-group tasks replace the old 1536 coroutine launches (one per
+        // cell) and keep the cold-cache fan-out: a per-stream task would
+        // serialize the heavy height stream on one thread (measured 160.7us
+        // vs 95.9us on the ctx-fill scenario; 24 tasks of 4 rows measured
+        // 87.4us single-chunk - round 17).
         ChunkedDataCache<?>[] caches = {height, biome, cave, rock, fluid, region};
         List<Future<?>> futures = null;
         for (ChunkedDataCache<?> c : caches) {
             if (!c.isCache()) continue;
-            for (int j = 0; j < 16; j++) {
-                if (futures == null) futures = new ArrayList<>(96);
+            for (int j = 0; j < 16; j += ROWS_PER_TASK) {
+                if (futures == null) futures = new ArrayList<>(96 / ROWS_PER_TASK + 1);
                 final ChunkedDataCache<?> cc = c;
-                final int row = j;
-                futures.add(MultiBurst.burst.submit(() -> cc.fillRow(row)));
+                final int from = j;
+                final int to = Math.min(16, j + ROWS_PER_TASK);
+                futures.add(MultiBurst.burst.submit(() -> {
+                    for (int row = from; row < to; row++) {
+                        cc.fillRow(row);
+                    }
+                }));
             }
         }
         if (futures == null) return;
