@@ -81,8 +81,17 @@ public class NoiseExplorerGUI extends JPanel implements MouseWheelListener, List
     double lz = Double.MAX_VALUE; //MouseY
     double t;
     double tz;
+    private static NoiseExplorerGUI active;
 
     public NoiseExplorerGUI() {
+        // each /iris studio noise created a new instance and registered a new
+        // Bukkit listener without ever unregistering the previous one
+        synchronized (NoiseExplorerGUI.class) {
+            if (active != null) {
+                Iris.instance.unregisterListener(active);
+            }
+            active = this;
+        }
         Iris.instance.registerListener(this);
         addMouseWheelListener(this);
         addMouseMotionListener(new MouseMotionListener() {

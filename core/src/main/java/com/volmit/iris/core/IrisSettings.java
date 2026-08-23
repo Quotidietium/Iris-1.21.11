@@ -35,7 +35,7 @@ import java.io.IOException;
 @SuppressWarnings("SynchronizeOnNonFinalField")
 @Data
 public class IrisSettings {
-    public static IrisSettings settings;
+    public static volatile IrisSettings settings;
     private IrisSettingsGeneral general = new IrisSettingsGeneral();
     private IrisSettingsWorld world = new IrisSettingsWorld();
     private IrisSettingsGUI gui = new IrisSettingsGUI();
@@ -60,37 +60,43 @@ public class IrisSettings {
             return settings;
         }
 
-        settings = new IrisSettings();
-
-        File s = Iris.instance.getDataFile("settings.json");
-
-        if (!s.exists()) {
-            try {
-                IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
-            } catch (JSONException | IOException e) {
-                e.printStackTrace();
-                Iris.reportError(e);
+        synchronized (IrisSettings.class) {
+            if (settings != null) {
+                return settings;
             }
-        } else {
-            try {
-                String ss = IO.readAll(s);
-                settings = new Gson().fromJson(ss, IrisSettings.class);
+
+            settings = new IrisSettings();
+
+            File s = Iris.instance.getDataFile("settings.json");
+
+            if (!s.exists()) {
                 try {
                     IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
-                } catch (IOException e) {
+                } catch (JSONException | IOException e) {
                     e.printStackTrace();
+                    Iris.reportError(e);
                 }
-            } catch (Throwable ee) {
-                // Iris.reportError(ee); causes a self-reference & stackoverflow
-                Iris.error("Configuration Error in settings.json! " + ee.getClass().getSimpleName() + ": " + ee.getMessage());
+            } else {
+                try {
+                    String ss = IO.readAll(s);
+                    settings = new Gson().fromJson(ss, IrisSettings.class);
+                    try {
+                        IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                } catch (Throwable ee) {
+                    // Iris.reportError(ee); causes a self-reference & stackoverflow
+                    Iris.error("Configuration Error in settings.json! " + ee.getClass().getSimpleName() + ": " + ee.getMessage());
+                }
             }
-        }
 
-        return settings;
+            return settings;
+        }
     }
 
     public static void invalidate() {
-        synchronized (settings) {
+        synchronized (IrisSettings.class) {
             settings = null;
         }
     }
