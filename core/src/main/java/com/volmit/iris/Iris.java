@@ -76,6 +76,8 @@ import org.jetbrains.annotations.Nullable;
 import java.io.*;
 import java.lang.annotation.Annotation;
 import java.net.URL;
+import java.net.URLConnection;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -191,13 +193,9 @@ public class Iris extends VolmitPlugin implements Listener {
         File f = Iris.instance.getDataFile("cache", h.substring(0, 2), h.substring(3, 5), h);
 
         if (!f.exists()) {
-            try (BufferedInputStream in = new BufferedInputStream(new URL(url).openStream()); FileOutputStream fileOutputStream = new FileOutputStream(f)) {
-                byte[] dataBuffer = new byte[1024];
-                int bytesRead;
-                while ((bytesRead = in.read(dataBuffer, 0, 1024)) != -1) {
-                    fileOutputStream.write(dataBuffer, 0, bytesRead);
-                    Iris.verbose("Aquiring " + name);
-                }
+            try {
+                downloadToFile(url, f);
+                Iris.verbose("Acquired " + name);
             } catch (IOException e) {
                 Iris.reportError(e);
             }
@@ -210,14 +208,14 @@ public class Iris extends VolmitPlugin implements Listener {
         String h = IO.hash(name + "*" + url);
         File f = Iris.instance.getDataFile("cache", h.substring(0, 2), h.substring(3, 5), h);
 
-        try (BufferedInputStream in = new BufferedInputStream(new URL(url).openStream()); FileOutputStream fileOutputStream = new FileOutputStream(f)) {
-            byte[] dataBuffer = new byte[1024];
-            int bytesRead;
-            while ((bytesRead = in.read(dataBuffer, 0, 1024)) != -1) {
-                fileOutputStream.write(dataBuffer, 0, bytesRead);
-            }
+        try {
+            downloadToFile(url, f);
         } catch (IOException e) {
             Iris.reportError(e);
+        }
+
+        if (!f.exists()) {
+            return "";
         }
 
         try {
@@ -233,20 +231,43 @@ public class Iris extends VolmitPlugin implements Listener {
         String h = IO.hash(name + "*" + url);
         File f = Iris.instance.getDataFile("cache", h.substring(0, 2), h.substring(3, 5), h);
         Iris.verbose("Download " + name + " -> " + url);
-        try (BufferedInputStream in = new BufferedInputStream(new URL(url).openStream()); FileOutputStream fileOutputStream = new FileOutputStream(f)) {
-            byte[] dataBuffer = new byte[1024];
+        try {
+            downloadToFile(url, f);
+        } catch (IOException e) {
+            e.printStackTrace();
+            Iris.reportError(e);
+            return null;
+        }
+
+        return f;
+    }
+
+    /**
+     * Download a url to a file with connect/read timeouts. A partially written
+     * file is deleted on failure so a dead cache entry can never be served later.
+     */
+    private static void downloadToFile(String url, File f) throws IOException {
+        URLConnection c = new URL(url).openConnection();
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(60000);
+
+        try (BufferedInputStream in = new BufferedInputStream(c.getInputStream()); FileOutputStream fileOutputStream = new FileOutputStream(f)) {
+            byte[] dataBuffer = new byte[8192];
             int bytesRead;
-            while ((bytesRead = in.read(dataBuffer, 0, 1024)) != -1) {
+            while ((bytesRead = in.read(dataBuffer, 0, dataBuffer.length)) != -1) {
                 fileOutputStream.write(dataBuffer, 0, bytesRead);
             }
 
             fileOutputStream.flush();
         } catch (IOException e) {
-            e.printStackTrace();
-            Iris.reportError(e);
-        }
+            // Never leave a truncated file behind; getCached would serve it forever
+            try {
+                Files.deleteIfExists(f.toPath());
+            } catch (IOException ignored) {
 
-        return f;
+            }
+            throw e;
+        }
     }
 
     public static void warn(String format, Object... objs) {
