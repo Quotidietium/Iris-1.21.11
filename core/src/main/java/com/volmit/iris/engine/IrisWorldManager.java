@@ -658,6 +658,8 @@ public class IrisWorldManager extends EngineAssignedWorldManager {
     public void close() {
         super.close();
         looper.interrupt();
+        // never shut down before: every world create/close cycle leaked one idle thread
+        cleanupService.shutdownNow();
     }
 
     @Override

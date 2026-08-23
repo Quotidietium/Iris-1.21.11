@@ -202,7 +202,9 @@ public class PregeneratorJob implements PregenListener {
             try {
                 monitor.close();
                 J.sleep(3000);
-                frame.setVisible(false);
+                if (frame != null) {
+                    frame.setVisible(false);
+                }
             } catch (Throwable ignored) {
                 Iris.error("Error closing pregen gui");
             }

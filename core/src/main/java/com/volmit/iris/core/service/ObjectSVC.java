@@ -33,6 +33,8 @@ import java.util.Map;
 
 public class ObjectSVC implements IrisService {
 
+    private static final int MAX_UNDOS = 20;
+
     @Getter
     private final Deque<Map<Block, BlockData>> undos = new ArrayDeque<>();
 
@@ -49,6 +51,10 @@ public class ObjectSVC implements IrisService {
 
     public void addChanges(Map<Block, BlockData> oldBlocks) {
         undos.add(oldBlocks);
+        // unbounded before: every paste appended a full block map forever
+        while (undos.size() > MAX_UNDOS) {
+            undos.pollFirst();
+        }
     }
 
     public void revertChanges(int amount) {

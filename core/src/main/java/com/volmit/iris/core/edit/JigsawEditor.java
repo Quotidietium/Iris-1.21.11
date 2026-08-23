@@ -45,6 +45,7 @@ import org.bukkit.util.Vector;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 public class JigsawEditor implements Listener {
@@ -200,14 +201,38 @@ public class JigsawEditor implements Listener {
         J.car(ticker);
         Iris.instance.unregisterListener(this);
         try {
-            J.sfut(() -> {
+            CompletableFuture<?> f = J.sfut(() -> {
                 object.unplaceCenterY(origin);
                 falling.v().forEach(Runnable::run);
-            }).get();
+            });
+            // sfut returns null when the plugin is already disabled
+            if (f != null) {
+                f.get();
+            }
         } catch (InterruptedException | ExecutionException e) {
             e.printStackTrace();
         }
         editors.remove(player);
+    }
+
+    /**
+     * A player disconnecting mid-edit must not leak the editor, its repeating
+     * ticker task and the Player reference. Runs on the main thread, so the
+     * cleanup is done inline (exit() would block on a sync-scheduled task).
+     */
+    @EventHandler
+    public void on(org.bukkit.event.player.PlayerQuitEvent e) {
+        if (e.getPlayer().equals(player) && editors.get(player) == this) {
+            J.car(ticker);
+            Iris.instance.unregisterListener(this);
+            try {
+                object.unplaceCenterY(origin);
+                falling.v().forEach(Runnable::run);
+            } catch (Throwable t) {
+                Iris.reportError(t);
+            }
+            editors.remove(player);
+        }
     }
 
     public void onTick() {
