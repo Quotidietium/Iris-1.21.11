@@ -293,7 +293,7 @@ public class StudioSVC implements IrisService {
             return;
         }
 
-        if (packEntry.exists() && packEntry.listFiles().length > 0) {
+        if (packEntry.isDirectory() && packEntry.listFiles() != null && packEntry.listFiles().length > 0) {
             sender.sendMessage("Another pack is using the key " + key + ". IMPORT FAILED!");
             return;
         }
@@ -441,22 +441,35 @@ public class StudioSVC implements IrisService {
     }
 
     public void create(VolmitSender sender, String s, String downloadable) {
-        boolean shouldDelete = false;
-        File importPack = getWorkspaceFolder(downloadable);
-
-        if (importPack.listFiles().length == 0) {
-            downloadSearch(sender, downloadable, false);
-
-            if (importPack.listFiles().length > 0) {
-                shouldDelete = true;
-            }
-        }
-
-        if (importPack.listFiles().length == 0) {
-            sender.sendMessage("Couldn't find the pack to create a new dimension from.");
+        if (s == null || !s.matches("[a-zA-Z0-9_-]+")) {
+            sender.sendMessage("Invalid project name '" + s + "': only letters, numbers, - and _ are allowed");
             return;
         }
 
+        File importPack = getWorkspaceFolder(downloadable);
+
+        if (importPack.listFiles().length == 0) {
+            // This command runs on the main thread (sync decree); download the
+            // template off-thread, then re-enter here on the main thread
+            sender.sendMessage("Template pack '" + downloadable + "' not found - downloading it first...");
+            J.a(() -> {
+                downloadSearch(sender, downloadable, false);
+                J.s(() -> {
+                    if (importPack.listFiles().length == 0) {
+                        sender.sendMessage("Couldn't find the pack to create a new dimension from.");
+                        return;
+                    }
+                    finishCreate(sender, s, downloadable, true);
+                });
+            });
+            return;
+        }
+
+        finishCreate(sender, s, downloadable, false);
+    }
+
+    private void finishCreate(VolmitSender sender, String s, String downloadable, boolean deleteImported) {
+        File importPack = getWorkspaceFolder(downloadable);
         File importDimensionFile = new File(importPack, "dimensions/" + downloadable + ".json");
 
         if (!importDimensionFile.exists()) {
@@ -466,7 +479,7 @@ public class StudioSVC implements IrisService {
 
         sender.sendMessage("Importing " + downloadable + " into new Project " + s);
         createFrom(downloadable, s);
-        if (shouldDelete) {
+        if (deleteImported) {
             importPack.delete();
         }
         open(sender, s);
