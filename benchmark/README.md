@@ -25,6 +25,11 @@
 - **回归防护**：每轮测量的全部输出折叠进 64 位 FNV-1a digest；第 0 轮使用固定种子，
   任何代码改动后 digest 必须与基线一致，否则判定为改变了地形行为（红线）。
 - 坐标/种子由 `java.util.Random` 生成（算法规范固定，跨 JDK 稳定）。
+- **JDK 必须固定**（2026-08-25 事故）：`decorator-decorate`/`layers-gen` 两个噪声密集场景的
+  digest 对 `Math` 三角函数实现的微差异敏感。`java` 若经 Oracle `javapath` 垫片解析，
+  自动更新会静默切换运行时，导致 digest 漂移（当时误报为代码回归，跨 5 个提交重建复跑
+  证伪后重建基线）。跑 digest 基线/验证前先 `java -version` 确认构建号未变，或用绝对路径
+  指向固定 JDK。
 
 ## 离线依赖
 
