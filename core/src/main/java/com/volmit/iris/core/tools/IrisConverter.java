@@ -37,6 +37,7 @@ public class IrisConverter {
         ExecutorService executorService = Executors.newFixedThreadPool(1);
         executorService.submit(() -> {
             for (File schem : fileList) {
+                int progressTask = -1;
                 try {
                     PrecisionStopwatch p = PrecisionStopwatch.start();
                     IrisObject object;
@@ -68,6 +69,7 @@ public class IrisConverter {
                             i = J.ar(() -> {
                                 sender.sendProgress((double) v.get() / mv, "Converting");
                             }, 0);
+                            progressTask = i;
                         }
                     }
 
@@ -92,7 +94,7 @@ public class IrisConverter {
                             for (int w = 0; w < objW; w++) {
                                 int blockIndex = isBytes ? din.read() & 0xFF : Varint.readUnsignedVarInt(din);
                                 BlockData bd = blockmap.get(blockIndex);
-                                if (!bd.getMaterial().isAir()) {
+                                if (bd != null && !bd.getMaterial().isAir()) {
                                     object.setUnsigned(w, h, d, bd);
                                 }
                                 v.getAndAdd(1);
@@ -100,9 +102,8 @@ public class IrisConverter {
                         }
                     }
 
-                    if (i != -1) J.car(i);
+                    object.shrinkwrap();
                     try {
-                        object.shrinkwrap();
                         object.write(new File(folder, schem.getName().replace(".schem", ".iob")));
                         counter.incrementAndGet();
                         if (sender.isPlayer()) {
@@ -126,7 +127,12 @@ public class IrisConverter {
 
                 } catch (Exception e) {
                     sender.sendMessage(C.RED + "Failed to convert: " + schem.getName());
-                    e.printStackTrace();
+                    Iris.reportError(e);
+                } finally {
+                    if (progressTask != -1) {
+                        J.car(progressTask);
+                        progressTask = -1;
+                    }
                 }
             }
             stopwatch.end();
@@ -137,6 +143,7 @@ public class IrisConverter {
                 sender.sendMessage(C.RED + "Some schematics failed to convert. Check the console for details.");
             }
         });
+        executorService.shutdown();
     }
 
     private static int resolveVersion(CompoundTag compound) throws Exception {
