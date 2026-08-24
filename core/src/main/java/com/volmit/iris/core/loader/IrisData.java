@@ -313,7 +313,7 @@ public class IrisData implements ExclusionStrategy, TypeAdapterFactory {
         return IrisData.get(dataFolder);
     }
 
-    private <T extends IrisRegistrant> ResourceLoader<T> registerLoader(Class<T> registrant) {
+    private <T extends IrisRegistrant> ResourceLoader<T> registerLoader(Class<T> registrant, KMap<Class<? extends IrisRegistrant>, ResourceLoader<? extends IrisRegistrant>> into) {
         try {
             IrisRegistrant rr = registrant.getConstructor().newInstance();
             ResourceLoader<T> r = null;
@@ -334,7 +334,7 @@ public class IrisData implements ExclusionStrategy, TypeAdapterFactory {
                 r = new ResourceLoader<>(dataFolder, this, rr.getFolderName(), rr.getTypeName(), registrant);
             }
 
-            loaders.put(registrant, r);
+            into.put(registrant, r);
 
             return r;
         } catch (Throwable e) {
@@ -356,29 +356,33 @@ public class IrisData implements ExclusionStrategy, TypeAdapterFactory {
                 .registerTypeAdapterFactory(this)
                 .registerTypeAdapter(MantleFlag.class, new MantleFlagAdapter())
                 .setPrettyPrinting();
-        loaders.clear();
+        // Build the new registry off to the side: generation threads keep reading
+        // the old (complete) map until the atomic reference swap below, instead of
+        // observing a cleared/partially-filled map during hotload
+        KMap<Class<? extends IrisRegistrant>, ResourceLoader<? extends IrisRegistrant>> fresh = new KMap<>();
         File packs = dataFolder;
         packs.mkdirs();
-        this.lootLoader = registerLoader(IrisLootTable.class);
-        this.spawnerLoader = registerLoader(IrisSpawner.class);
-        this.entityLoader = registerLoader(IrisEntity.class);
-        this.regionLoader = registerLoader(IrisRegion.class);
-        this.biomeLoader = registerLoader(IrisBiome.class);
-        this.modLoader = registerLoader(IrisMod.class);
-        this.dimensionLoader = registerLoader(IrisDimension.class);
-        this.jigsawPoolLoader = registerLoader(IrisJigsawPool.class);
-        this.jigsawStructureLoader = registerLoader(IrisJigsawStructure.class);
-        this.jigsawPieceLoader = registerLoader(IrisJigsawPiece.class);
-        this.generatorLoader = registerLoader(IrisGenerator.class);
-        this.caveLoader = registerLoader(IrisCave.class);
-        this.markerLoader = registerLoader(IrisMarker.class);
-        this.ravineLoader = registerLoader(IrisRavine.class);
-        this.blockLoader = registerLoader(IrisBlockData.class);
-        this.expressionLoader = registerLoader(IrisExpression.class);
-        this.objectLoader = registerLoader(IrisObject.class);
-        this.imageLoader = registerLoader(IrisImage.class);
-        this.scriptLoader = registerLoader(IrisScript.class);
-        this.matterObjectLoader = registerLoader(IrisMatterObject.class);
+        this.lootLoader = registerLoader(IrisLootTable.class, fresh);
+        this.spawnerLoader = registerLoader(IrisSpawner.class, fresh);
+        this.entityLoader = registerLoader(IrisEntity.class, fresh);
+        this.regionLoader = registerLoader(IrisRegion.class, fresh);
+        this.biomeLoader = registerLoader(IrisBiome.class, fresh);
+        this.modLoader = registerLoader(IrisMod.class, fresh);
+        this.dimensionLoader = registerLoader(IrisDimension.class, fresh);
+        this.jigsawPoolLoader = registerLoader(IrisJigsawPool.class, fresh);
+        this.jigsawStructureLoader = registerLoader(IrisJigsawStructure.class, fresh);
+        this.jigsawPieceLoader = registerLoader(IrisJigsawPiece.class, fresh);
+        this.generatorLoader = registerLoader(IrisGenerator.class, fresh);
+        this.caveLoader = registerLoader(IrisCave.class, fresh);
+        this.markerLoader = registerLoader(IrisMarker.class, fresh);
+        this.ravineLoader = registerLoader(IrisRavine.class, fresh);
+        this.blockLoader = registerLoader(IrisBlockData.class, fresh);
+        this.expressionLoader = registerLoader(IrisExpression.class, fresh);
+        this.objectLoader = registerLoader(IrisObject.class, fresh);
+        this.imageLoader = registerLoader(IrisImage.class, fresh);
+        this.scriptLoader = registerLoader(IrisScript.class, fresh);
+        this.matterObjectLoader = registerLoader(IrisMatterObject.class, fresh);
+        loaders = fresh;
         this.environment = PackEnvironment.create(this);
         builder.registerTypeAdapterFactory(KeyedType::createTypeAdapter);
 

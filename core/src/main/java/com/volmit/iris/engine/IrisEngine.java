@@ -91,11 +91,11 @@ public class IrisEngine implements Engine {
     private final AtomicBoolean cleaning;
     private final ChronoLatch cleanLatch;
     private final SeedManager seedManager;
-    private CompletableFuture<Long> hash32;
-    private EngineMode mode;
-    private EngineEffects effects;
-    private EngineEnvironment execution;
-    private EngineWorldManager worldManager;
+    private volatile CompletableFuture<Long> hash32;
+    private volatile EngineMode mode;
+    private volatile EngineEffects effects;
+    private volatile EngineEnvironment execution;
+    private volatile EngineWorldManager worldManager;
     private volatile int parallelism;
     private boolean failing;
     private boolean closed;
@@ -103,7 +103,7 @@ public class IrisEngine implements Engine {
     private double maxBiomeObjectDensity;
     private double maxBiomeLayerDensity;
     private double maxBiomeDecoratorDensity;
-    private IrisComplex complex;
+    private volatile IrisComplex complex;
 
     public IrisEngine(EngineTarget target, boolean studio) {
         this.studio = studio;
@@ -255,8 +255,12 @@ public class IrisEngine implements Engine {
     }
 
     public void hotloadComplex() {
-        complex.close();
-        complex = new IrisComplex(this);
+        // Build the replacement before publishing it: generation threads read this
+        // field constantly and must never observe it closed-then-empty mid-swap
+        IrisComplex fresh = new IrisComplex(this);
+        IrisComplex old = complex;
+        complex = fresh;
+        old.close();
     }
 
     public void hotloadSilently() {
