@@ -37,16 +37,21 @@ import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 @Data
 public class ExternalDataSVC implements IrisService {
 
-    private KList<ExternalDataProvider> providers = new KList<>(), activeProviders = new KList<>();
+    // Read concurrently by engine threads (chunk decoration / loot / block lookup),
+    // written only on the main thread when a provider plugin enables or disables.
+    private final List<ExternalDataProvider> providers = new CopyOnWriteArrayList<>();
+    private final List<ExternalDataProvider> activeProviders = new CopyOnWriteArrayList<>();
 
     @Override
     public void onEnable() {
@@ -77,6 +82,17 @@ public class ExternalDataSVC implements IrisService {
                 Iris.instance.registerListener(edp);
                 Iris.info("Enabled ExternalDataProvider for %s.", edp.getPluginId());
             });
+        }
+    }
+
+    @EventHandler
+    public void onPluginDisable(PluginDisableEvent e) {
+        for (ExternalDataProvider edp : activeProviders) {
+            if (e.getPlugin().equals(edp.getPlugin())) {
+                activeProviders.remove(edp);
+                Iris.instance.unregisterListener(edp);
+                Iris.info("Disabled ExternalDataProvider for %s.", edp.getPluginId());
+            }
         }
     }
 
@@ -167,7 +183,15 @@ public class ExternalDataSVC implements IrisService {
         return activeProviders.stream()
                 .flatMap(p -> p.getTypes(DataType.BLOCK)
                         .stream()
-                        .map(id -> new Pair<>(id, p.getBlockProperties(id))))
+                        .map(id -> {
+                            try {
+                                return new Pair<Identifier, List<BlockProperty>>(id, p.getBlockProperties(id));
+                            } catch (MissingResourceException e) {
+                                Iris.error(e.getMessage() + " - [" + e.getClassName() + ":" + e.getKey() + "]");
+                                return null;
+                            }
+                        })
+                        .filter(Objects::nonNull))
                 .toList();
     }
 
@@ -178,7 +202,14 @@ public class ExternalDataSVC implements IrisService {
         String state = key.key().split("\\Q[\\E")[1].split("\\Q]\\E")[0];
         KMap<String, String> stateMap = new KMap<>();
         if (!state.isEmpty()) {
-            Arrays.stream(state.split(",")).forEach(s -> stateMap.put(s.split("=")[0], s.split("=")[1]));
+            for (String s : state.split(",")) {
+                String[] kv = s.split("=", 2);
+                if (kv.length != 2 || kv[0].isEmpty()) {
+                    Iris.warn("Malformed block state '%s' in '%s' (expected key=value)", s, key);
+                    continue;
+                }
+                stateMap.put(kv[0], kv[1]);
+            }
         }
         return new Pair<>(new Identifier(key.namespace(), key.key().split("\\Q[\\E")[0]), stateMap);
     }

@@ -1,5 +1,6 @@
 package com.volmit.iris.core.link;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.core.link.data.DataType;
 import com.volmit.iris.core.nms.container.BiomeColor;
 import com.volmit.iris.core.nms.container.BlockProperty;
@@ -139,13 +140,21 @@ public abstract class ExternalDataProvider implements Listener {
         if ("true".equals(state.get("randomYaw"))) {
             yaw = rng.f(0, 360);
         } else if (state.containsKey("yaw")) {
-            yaw = Float.parseFloat(state.get("yaw"));
+            try {
+                yaw = Float.parseFloat(state.get("yaw"));
+            } catch (NumberFormatException e) {
+                Iris.warn("Invalid yaw '%s', falling back to 0", state.get("yaw"));
+            }
         }
         if ("true".equals(state.get("randomFace"))) {
             BlockFace[] faces = BlockFace.values();
             face = faces[rng.i(0, faces.length - 1)];
         } else if (state.containsKey("face")) {
-            face = BlockFace.valueOf(state.get("face").toUpperCase());
+            try {
+                face = BlockFace.valueOf(state.get("face").toUpperCase());
+            } catch (IllegalArgumentException e) {
+                Iris.warn("Invalid face '%s', falling back to NORTH", state.get("face"));
+            }
         }
         if (face == BlockFace.SELF) {
             face = BlockFace.NORTH;
