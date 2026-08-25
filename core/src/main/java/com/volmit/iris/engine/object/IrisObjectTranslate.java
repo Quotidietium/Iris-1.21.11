@@ -59,7 +59,9 @@ public class IrisObjectTranslate {
 
     public BlockVector translate(BlockVector i) {
         if (canTranslate()) {
-            return (BlockVector) i.clone().add(new BlockVector(x, y, z));
+            // In-place add: the caller-visible contract is "returns the
+            // translated vector"; no caller reads the argument afterwards.
+            i.add(new BlockVector(x, y, z));
         }
 
         return i;
@@ -67,7 +69,9 @@ public class IrisObjectTranslate {
 
     public BlockVector translate(BlockVector clone, IrisObjectRotation rotation, int sx, int sy, int sz) {
         if (canTranslate()) {
-            return (BlockVector) clone.clone().add(rotation.rotate(new BlockVector(x, y, z), sx, sy, sz));
+            // Same in-place contract; rotate already returns a vector the
+            // caller owns, so the inner fresh offset vector stays.
+            clone.add(rotation.rotate(new BlockVector(x, y, z), sx, sy, sz));
         }
 
         return clone;

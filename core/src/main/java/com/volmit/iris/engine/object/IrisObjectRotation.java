@@ -366,7 +366,11 @@ public class IrisObjectRotation {
             return b;
         }
 
-        BlockVector v = b.clone();
+        // In-place transform: every caller passes either a fresh vector or one
+        // whose original value is no longer read (the place loops reassign
+        // i = rotate(gVec, ...)), so the old defensive clone() per block is
+        // unobservable from the outside.
+        BlockVector v = b;
 
         if (canRotateX()) {
             if (getXAxis().isLocked()) {
