@@ -24,6 +24,7 @@
 | [round19-lookup-residue.md](round19-lookup-residue.md) | 读路径残留：MantleChunk.get 停止物化空切片（R11 section 级修正补全到 slice 级）+ carve 迭代器 section/slice 备忘——carve-modify **1.09×**；palette id 末值备忘测得 set 路径 10% 回归（内联预算机理）当场回退 |
 | [round20-palette-read-residue.md](round20-palette-read-residue.md) | palette 读路径 volatile 探针移除（HashPalette/LinearPalette 每次格读的 size.get）+ air/fluid 材料谓词瘦身——datacontainer-get **1.22×**（两会话一致）；isSolid/isOre IntSet 化无信号回退；carve-modify 净效应被主机双模态漂移（~1.2×、5-10min 周期）淹没按零计；**golden 双环境态多值基线治理**（同日二次翻转证据链） |
 | [round21-object-transform-inplace.md](round21-object-transform-inplace.md) | 对象放置残留：rotate/translate 每块防御克隆消除（就地变换，调用方审计证明不可观测）——object-place 分配 **-11.0%**、stilt **-14.2%**（B/op 漂移免疫）；时间读数在漂移带内不做声明；place 每块 `d.clone()` 确认为正确性依赖不动 |
+| [round22-carve-iterate-native.md](round22-carve-iterate-native.md) | carve 迭代链原生化（`Consumer4I` + `Hunk.iterateSyncInts` 五实现 + `MantleChunk.iterateInts`，遍历序不变）+ CaveZone 复用——carve-modify 分配 **-7.1%**（29/29 样本），与 JFR 分配占比 7.24% 精确吻合；walls/positions CHM 因 rng 顺序依赖结构性保留；前置证伪 VectorMap `entrySet().forEach` 方向（CHM.forEach 本就零分配，EntrySetView 每条目 new MapEntry） |
 
 - 原始数据:`benchmark/results/round*.csv`(每场景 5 次测量)
 - 金样本:`benchmark/golden/golden.csv`(**49 场景**固定种子摘要,行为一致性的判定基准)
