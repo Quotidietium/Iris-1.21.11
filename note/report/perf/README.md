@@ -27,6 +27,7 @@
 | [round22-carve-iterate-native.md](round22-carve-iterate-native.md) | carve 迭代链原生化（`Consumer4I` + `Hunk.iterateSyncInts` 五实现 + `MantleChunk.iterateInts`，遍历序不变）+ CaveZone 复用——carve-modify 分配 **-7.1%**（29/29 样本），与 JFR 分配占比 7.24% 精确吻合；walls/positions CHM 因 rng 顺序依赖结构性保留；前置证伪 VectorMap `entrySet().forEach` 方向（CHM.forEach 本就零分配，EntrySetView 每条目 new MapEntry） |
 | [round23-cave-set-packing.md](round23-cave-set-packing.md) | cave 写路径集合代数 packed-long 化（setNoiseMasked filled 链：mask 预转换 + LongOpenHashSet 球填充，零 IrisPosition/Node）——cave-carve 分配 **-8.4% 中位（9/9 seed）**，CNG 纯度+集合等价 200 试验+位域往返 8.1M 组合三层机器验证；perfection 谓词合并无信号（JIT CSE 已消除）当场回退；位域 unpack 两次符号扩展事故与修复记录 |
 | [round24-mantlewriter-constructor.md](round24-mantlewriter-constructor.md) | MantleWriter 构造器装箱中转消除（单线程路径临时 KMap 169×Long+Node+putAll → 直接 Long2ObjectOpenHashMap 原生 put）——cave-carve 分配 **-34~40%（9/9 seed，两轮累计约 -45%）**；R23 剖析 lambda$new$0 21% 分配之谜底；worm 重构因容量常数差致方向混合按纪律回退（初始容量/对象布局是可测量的记录） |
+| [round25-rotation-plan-rejected.md](round25-rotation-plan-rejected.md) | **负结果轮**：RotationPlan 计划化（place 级旋转预解析）经 60000 位级验证 + 同时段 A/B 测得 object-place **9/9 更慢（中位 +8.6%）** 当场回退——剖析样本占比≠可回收成本（分支预测完美的谓词链是被剖析器看见的便宜代码），与 R6/R23 同族教训第三账；object-place 重剖析遗留发现（String 伪影 40%、CursorIterator 本质） |
 
 - 原始数据:`benchmark/results/round*.csv`(每场景 5 次测量)
 - 金样本:`benchmark/golden/golden.csv`(**49 场景**固定种子摘要,行为一致性的判定基准)
