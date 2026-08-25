@@ -36,11 +36,10 @@ public class LinearPalette<T> implements Palette<T> {
 
     @Override
     public T get(int id) {
-        if (id < 0 || id >= size.get()) {
-            return null;
-        }
-
-        return palette.get(id);
+        // Length bound instead of a size.get() volatile probe: unwritten
+        // slots (id >= size) read as null, same as the old early return.
+        AtomicReferenceArray<T> a = palette;
+        return id >= 0 && id < a.length() ? a.get(id) : null;
     }
 
     @Override

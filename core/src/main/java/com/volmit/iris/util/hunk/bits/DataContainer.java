@@ -188,8 +188,7 @@ public class DataContainer<T> {
 
             DataBits d = data;
             Palette<T> p = palette;
-            int id = d.get(position);
-            T value = id <= 0 ? null : p.get(id);
+            T value = p.get(d.get(position));
 
             if (structureVersion == v) {
                 return value;

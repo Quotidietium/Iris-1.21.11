@@ -17,3 +17,4 @@ benchmark/results/_*/
 benchmark/lib/*.jar
 prof18/
 *.jfr
+benchmark/out/

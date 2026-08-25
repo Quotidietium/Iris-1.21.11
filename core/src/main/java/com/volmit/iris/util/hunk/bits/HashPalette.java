@@ -41,7 +41,12 @@ public class HashPalette<T> implements Palette<T> {
 
     @Override
     public T get(int id) {
-        if (id <= 0 || id >= size.get()) {
+        // No size.get() probe: unwritten AtomicReferenceArray slots read as
+        // null, which is exactly what the old size-based early return
+        // produced. size is monotonic (ids are append-only, never reused),
+        // so the set of ids returning non-null is identical, and the
+        // id's entry is published before the cell write that references it.
+        if (id <= 0) {
             return null;
         }
 

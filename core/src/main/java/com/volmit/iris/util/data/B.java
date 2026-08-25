@@ -383,7 +383,7 @@ public class B {
     }
 
     public static boolean isWater(BlockData b) {
-        return b.getMaterial().equals(Material.WATER);
+        return b.getMaterial() == Material.WATER;
     }
 
     public static BlockData getAir() {
@@ -642,7 +642,8 @@ public class B {
     }
 
     public static boolean isFluid(BlockData d) {
-        return d.getMaterial().equals(Material.WATER) || d.getMaterial().equals(Material.LAVA);
+        Material m = d.getMaterial();
+        return m == Material.WATER || m == Material.LAVA;
     }
 
     public static boolean isAirOrFluid(BlockData d) {
@@ -654,7 +655,8 @@ public class B {
             return true;
         }
 
-        return d.getMaterial().equals(Material.AIR) || d.getMaterial().equals(Material.CAVE_AIR) || d.getMaterial().equals(Material.VOID_AIR);
+        Material m = d.getMaterial();
+        return m == Material.AIR || m == Material.CAVE_AIR || m == Material.VOID_AIR;
     }
 
 
