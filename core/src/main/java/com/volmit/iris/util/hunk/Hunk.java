@@ -722,6 +722,25 @@ public interface Hunk<T> {
         return this;
     }
 
+    /**
+     * Primitive-coordinate variant of {@link #iterateSync(Consumer4)}: identical
+     * traversal order, but the coordinates reach the consumer as ints so
+     * per-block call chains never box them. Implementations that override
+     * {@link #iterateSync(Consumer4)} (e.g. to skip nulls) override this
+     * symmetrically.
+     */
+    default Hunk<T> iterateSyncInts(Consumer4I<T> c) {
+        for (int i = 0; i < getWidth(); i++) {
+            for (int j = 0; j < getHeight(); j++) {
+                for (int k = 0; k < getDepth(); k++) {
+                    c.accept(i, j, k, get(i, j, k));
+                }
+            }
+        }
+
+        return this;
+    }
+
     default Hunk<T> updateSync(Function4<Integer, Integer, Integer, T, T> c) {
         for (int i = 0; i < getWidth(); i++) {
             for (int j = 0; j < getHeight(); j++) {

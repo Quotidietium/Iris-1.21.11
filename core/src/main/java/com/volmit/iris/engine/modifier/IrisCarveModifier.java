@@ -28,7 +28,7 @@ import com.volmit.iris.util.collection.KMap;
 import com.volmit.iris.util.context.ChunkContext;
 import com.volmit.iris.util.data.B;
 import com.volmit.iris.util.documentation.ChunkCoordinates;
-import com.volmit.iris.util.function.Consumer4;
+import com.volmit.iris.util.function.Consumer4I;
 import com.volmit.iris.util.hunk.Hunk;
 import com.volmit.iris.util.mantle.Mantle;
 import com.volmit.iris.util.mantle.MantleChunk;
@@ -81,7 +81,7 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
         // + slice map lookup into a compare. Per-onModify state: onModify is
         // single-threaded per chunk.
         final CavernMemo memo = new CavernMemo();
-        Consumer4<Integer, Integer, Integer, MatterCavern> iterator = (xx, yy, zz, c) -> {
+        Consumer4I<MatterCavern> iterator = (xx, yy, zz, c) -> {
             if (c == null) {
                 return;
             }
@@ -148,7 +148,7 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
             }
         };
 
-        mc.iterate(MatterCavern.class, iterator);
+        mc.iterateInts(MatterCavern.class, iterator);
 
         KMap<Long, int[]> positions = new KMap<>();
         for (int i = 0; i < touched[0]; i++) {
@@ -173,6 +173,9 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
         });
 
         final int engineHeight = getEngine().getHeight();
+        // One mutable zone per onModify: zones are processed strictly
+        // sequentially, so a reset beats a fresh CaveZone per run.
+        final CaveZone zone = new CaveZone();
         positions.forEach((k, v) -> {
             if (v.length == 0) {
                 return;
@@ -181,7 +184,7 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
             int rx = Cache.keyX(k);
             int rz = Cache.keyZ(k);
             java.util.Arrays.sort(v);
-            CaveZone zone = new CaveZone();
+            zone.setCeiling(-1);
             zone.setFloor(v[0]);
             int buf = v[0] - 1;
 
@@ -195,7 +198,7 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
                     zone.ceiling = buf;
                 } else if (zone.isValid(getEngine())) {
                     processZone(output, mc, mantle, zone, rx, rz, rx + (x << 4), rz + (z << 4));
-                    zone = new CaveZone();
+                    zone.setCeiling(-1);
                     zone.setFloor(i);
                     buf = i;
                 }

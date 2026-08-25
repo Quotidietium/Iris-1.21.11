@@ -23,6 +23,7 @@ import com.volmit.iris.core.tools.IrisToolbelt;
 import com.volmit.iris.util.documentation.ChunkCoordinates;
 import com.volmit.iris.util.documentation.ChunkRelativeBlockCoordinates;
 import com.volmit.iris.util.function.Consumer4;
+import com.volmit.iris.util.function.Consumer4I;
 import com.volmit.iris.util.io.CountingDataInputStream;
 import com.volmit.iris.util.matter.IrisMatter;
 import com.volmit.iris.util.matter.Matter;
@@ -277,6 +278,27 @@ public class MantleChunk extends FlaggedChunk {
 
                 if (t != null) {
                     t.iterateSync((a, b, c, f) -> iterator.accept(a, b + bs, c, f));
+                }
+            }
+        }
+    }
+
+    /**
+     * Primitive-coordinate variant of {@link #iterate(Class, Consumer4)}:
+     * identical traversal order (sections ascending, in-slice order), but the
+     * per-block coordinates are never boxed. Separate name so implicit lambdas
+     * at existing call sites keep resolving to the boxed overload.
+     */
+    public <T> void iterateInts(Class<T> type, Consumer4I<T> iterator) {
+        for (int i = 0; i < sections.length(); i++) {
+            int bs = (i << 4);
+            Matter matter = get(i);
+
+            if (matter != null) {
+                MatterSlice<T> t = matter.getSlice(type);
+
+                if (t != null) {
+                    t.iterateSyncInts((a, b, c, f) -> iterator.accept(a, b + bs, c, f));
                 }
             }
         }

@@ -20,6 +20,7 @@ package com.volmit.iris.util.hunk.storage;
 
 import com.volmit.iris.util.collection.KMap;
 import com.volmit.iris.util.function.Consumer4;
+import com.volmit.iris.util.function.Consumer4I;
 import com.volmit.iris.util.function.Consumer4IO;
 import com.volmit.iris.util.hunk.Hunk;
 import lombok.Data;
@@ -67,6 +68,20 @@ public class MappedHunk<T> extends StorageHunk<T> implements Hunk<T> {
 
     @Override
     public synchronized Hunk<T> iterateSync(Consumer4<Integer, Integer, Integer, T> c) {
+        int idx, z;
+
+        for (Map.Entry<Integer, T> g : data.entrySet()) {
+            idx = g.getKey();
+            z = idx / (getWidth() * getHeight());
+            idx -= (z * getWidth() * getHeight());
+            c.accept(idx % getWidth(), idx / getWidth(), z, g.getValue());
+        }
+
+        return this;
+    }
+
+    @Override
+    public synchronized Hunk<T> iterateSyncInts(Consumer4I<T> c) {
         int idx, z;
 
         for (Map.Entry<Integer, T> g : data.entrySet()) {

@@ -19,6 +19,7 @@
 package com.volmit.iris.util.hunk.storage;
 
 import com.volmit.iris.util.function.Consumer4;
+import com.volmit.iris.util.function.Consumer4I;
 import com.volmit.iris.util.function.Consumer4IO;
 import com.volmit.iris.util.hunk.Hunk;
 import com.volmit.iris.util.hunk.bits.DataContainer;
@@ -74,6 +75,12 @@ public abstract class PaletteOrHunk<T> extends StorageHunk<T> implements Hunk<T>
     @Override
     public synchronized Hunk<T> iterateSync(Consumer4<Integer, Integer, Integer, T> c) {
         hunk.iterateSync(c);
+        return this;
+    }
+
+    @Override
+    public synchronized Hunk<T> iterateSyncInts(Consumer4I<T> c) {
+        hunk.iterateSyncInts(c);
         return this;
     }
 
