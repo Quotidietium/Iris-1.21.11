@@ -41,6 +41,8 @@ import com.volmit.iris.util.matter.MatterCavern;
 import com.volmit.iris.util.matter.TileWrapper;
 import com.volmit.iris.util.noise.CNG;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import lombok.Data;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.util.Vector;
@@ -539,6 +541,16 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
      * @param <T>     the type of data to apply to the mantle
      */
     public <T> void setNoiseMasked(List<IrisPosition> vectors, double radius, double threshold, CNG shape, Set<IrisPosition> masks, boolean filled, Function3<Integer, Integer, Integer, T> data) {
+        if (filled) {
+            // Cave-carve path (the only production caller passes filled=true):
+            // the whole chain is order-free — the noise predicate and the data
+            // function are pure, mantle writes are idempotent per cell, and no
+            // rng is consumed — so the set algebra can run on packed longs
+            // with zero IrisPosition/HashSet-node allocation per ball cell.
+            setNoiseMaskedFilledCompact(vectors, radius, threshold, shape, masks, data);
+            return;
+        }
+
         Set<IrisPosition> vset = cleanup(vectors);
         vset = masks == null ? getBallooned(vset, radius) : getMasked(vset, masks, radius);
         vset.removeIf(p -> shape.noise(p.getX(), p.getY(), p.getZ()) < threshold);
@@ -548,6 +560,91 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
         }
 
         setConsumer(vset, data);
+    }
+
+    private <T> void setNoiseMaskedFilledCompact(List<IrisPosition> vectors, double radius, double threshold, CNG shape, Set<IrisPosition> masks, Function3<Integer, Integer, Integer, T> data) {
+        Set<IrisPosition> tips = cleanup(vectors);
+        int ceil = (int) Math.ceil(radius);
+        double r2 = Math.pow(radius, 2);
+
+        final double[] sq = new double[(ceil << 1) + 1];
+        for (int i = 0; i < sq.length; i++) {
+            sq[i] = Math.pow(i - ceil, 2);
+        }
+
+        // Relative-offset masks packed once; probes below become a long-hash
+        // lookup instead of a fresh IrisPosition per ball cell. An empty (but
+        // non-null) mask set still filters everything out, like the original.
+        LongOpenHashSet maskSet = null;
+        if (masks != null) {
+            maskSet = new LongOpenHashSet(Math.max(1, masks.size()));
+            for (IrisPosition m : masks) {
+                maskSet.add(packCell(m.getX(), m.getY(), m.getZ()));
+            }
+        }
+
+        LongOpenHashSet cells = new LongOpenHashSet(Math.max(16, tips.size() * (ceil + 1)));
+        for (IrisPosition v : tips) {
+            int tipX = v.getX();
+            int tipY = v.getY();
+            int tipZ = v.getZ();
+
+            for (int x = -ceil; x <= ceil; x++) {
+                double xy = sq[x + ceil];
+                for (int y = -ceil; y <= ceil; y++) {
+                    double xz = xy + sq[y + ceil];
+                    for (int z = -ceil; z <= ceil; z++) {
+                        if (xz + sq[z + ceil] > r2) {
+                            continue;
+                        }
+                        if (maskSet != null && !maskSet.contains(packCell(x, y, z))) {
+                            continue;
+                        }
+                        cells.add(packCell(tipX + x, tipY + y, tipZ + z));
+                    }
+                }
+            }
+        }
+
+        // Same filter as the removeIf on the original path: per-cell predicate,
+        // iteration order cannot change which cells survive.
+        LongIterator it = cells.iterator();
+        while (it.hasNext()) {
+            long p = it.nextLong();
+            if (shape.noise(unpackCellX(p), unpackCellY(p), unpackCellZ(p)) < threshold) {
+                it.remove();
+            }
+        }
+
+        for (long p : cells) {
+            int x = unpackCellX(p);
+            int y = unpackCellY(p);
+            int z = unpackCellZ(p);
+            try {
+                setData(x, y, z, data.apply(x, y, z));
+            } catch (Throwable e) {
+                Iris.error("No set? " + data + " for " + x + " " + y + " " + z);
+            }
+        }
+    }
+
+    private static long packCell(int x, int y, int z) {
+        return ((x & 0x1FFFFFL) << 42) | ((y & 0x1FFFFFL) << 21) | (z & 0x1FFFFFL);
+    }
+
+    // Sign-extend the 21-bit fields: shift the field to the int top, then
+    // arithmetic-shift back down. X's sign bit sits at bit 62 (63 stays free),
+    // so X needs the explicit mask before its sign shift.
+    private static int unpackCellX(long p) {
+        return ((int) (p >> 42)) << 11 >> 11;
+    }
+
+    private static int unpackCellY(long p) {
+        return ((int) (p >> 21)) << 11 >> 11;
+    }
+
+    private static int unpackCellZ(long p) {
+        return (int) p << 11 >> 11;
     }
 
     private static Set<IrisPosition> getMasked(Set<IrisPosition> vectors, Set<IrisPosition> masks, double radius) {
