@@ -23,6 +23,7 @@
 | [round18-storage-lockfree.md](round18-storage-lockfree.md) | 存储底座：DataContainer 每格读写锁消除（seqlock 快照校验，读锁 unlock 独占 carve-modify 29.4% 样本）+ DataBits 位宽增长字级重打包——carve-modify **1.4-1.56×**、matter-roundtrip **1.23×**、cave-carve **1.23×**、容器读 **1.51×**；VerifyContainerRace 竞争压测 3×28 亿读 0 撕裂；49/49 位级一致 |
 | [round19-lookup-residue.md](round19-lookup-residue.md) | 读路径残留：MantleChunk.get 停止物化空切片（R11 section 级修正补全到 slice 级）+ carve 迭代器 section/slice 备忘——carve-modify **1.09×**；palette id 末值备忘测得 set 路径 10% 回归（内联预算机理）当场回退 |
 | [round20-palette-read-residue.md](round20-palette-read-residue.md) | palette 读路径 volatile 探针移除（HashPalette/LinearPalette 每次格读的 size.get）+ air/fluid 材料谓词瘦身——datacontainer-get **1.22×**（两会话一致）；isSolid/isOre IntSet 化无信号回退；carve-modify 净效应被主机双模态漂移（~1.2×、5-10min 周期）淹没按零计；**golden 双环境态多值基线治理**（同日二次翻转证据链） |
+| [round21-object-transform-inplace.md](round21-object-transform-inplace.md) | 对象放置残留：rotate/translate 每块防御克隆消除（就地变换，调用方审计证明不可观测）——object-place 分配 **-11.0%**、stilt **-14.2%**（B/op 漂移免疫）；时间读数在漂移带内不做声明；place 每块 `d.clone()` 确认为正确性依赖不动 |
 
 - 原始数据:`benchmark/results/round*.csv`(每场景 5 次测量)
 - 金样本:`benchmark/golden/golden.csv`(**49 场景**固定种子摘要,行为一致性的判定基准)
