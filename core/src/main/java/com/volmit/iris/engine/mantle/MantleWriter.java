@@ -35,6 +35,7 @@ import com.volmit.iris.util.documentation.ChunkCoordinates;
 import com.volmit.iris.util.function.Function3;
 import com.volmit.iris.util.mantle.Mantle;
 import com.volmit.iris.util.mantle.MantleChunk;
+import com.volmit.iris.util.math.Positions;
 import com.volmit.iris.util.math.RNG;
 import com.volmit.iris.util.matter.Matter;
 import com.volmit.iris.util.matter.MatterCavern;
@@ -70,16 +71,31 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
         this.z = z;
 
         final int parallelism = multicore ? Runtime.getRuntime().availableProcessors() / 2 : 4;
-        final var map = multicore ? cachedChunks : new KMap<Long, MantleChunk>(d * d, 1f, parallelism);
-        mantle.getChunks(
-                x - radius,
-                x + radius,
-                z - radius,
-                z + radius,
-                parallelism,
-                (i, j, c) -> map.put(Cache.key(i, j), c.use())
-        );
-        if (!multicore) cachedChunks.putAll(map);
+        // Fill cachedChunks directly. The single-threaded path used to stage
+        // every chunk in a boxed temporary KMap and copy it over afterwards -
+        // one Long box plus one CHM node per chunk, all garbage - while the
+        // long-keyed map sitting in cachedChunks takes the same put unboxed.
+        if (multicore) {
+            @SuppressWarnings("unchecked") final KMap<Long, MantleChunk> map = (KMap<Long, MantleChunk>) cachedChunks;
+            mantle.getChunks(
+                    x - radius,
+                    x + radius,
+                    z - radius,
+                    z + radius,
+                    parallelism,
+                    (i, j, c) -> map.put(Cache.key(i, j), c.use())
+            );
+        } else {
+            final Long2ObjectOpenHashMap<MantleChunk> map = (Long2ObjectOpenHashMap<MantleChunk>) cachedChunks;
+            mantle.getChunks(
+                    x - radius,
+                    x + radius,
+                    z - radius,
+                    z + radius,
+                    parallelism,
+                    (i, j, c) -> map.put(Cache.key(i, j), c.use())
+            );
+        }
     }
 
     private static Set<IrisPosition> getBallooned(Set<IrisPosition> vset, double radius) {
@@ -629,22 +645,19 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
     }
 
     private static long packCell(int x, int y, int z) {
-        return ((x & 0x1FFFFFL) << 42) | ((y & 0x1FFFFFL) << 21) | (z & 0x1FFFFFL);
+        return Positions.pack(x, y, z);
     }
 
-    // Sign-extend the 21-bit fields: shift the field to the int top, then
-    // arithmetic-shift back down. X's sign bit sits at bit 62 (63 stays free),
-    // so X needs the explicit mask before its sign shift.
     private static int unpackCellX(long p) {
-        return ((int) (p >> 42)) << 11 >> 11;
+        return Positions.unpackX(p);
     }
 
     private static int unpackCellY(long p) {
-        return ((int) (p >> 21)) << 11 >> 11;
+        return Positions.unpackY(p);
     }
 
     private static int unpackCellZ(long p) {
-        return (int) p << 11 >> 11;
+        return Positions.unpackZ(p);
     }
 
     private static Set<IrisPosition> getMasked(Set<IrisPosition> vectors, Set<IrisPosition> masks, double radius) {
