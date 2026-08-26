@@ -358,22 +358,52 @@ public class IrisObject extends IrisRegistrant {
         dos.writeInt(h);
         dos.writeInt(d);
         dos.writeUTF("Iris V2 IOB;");
-        KList<String> palette = new KList<>();
-
-        for (BlockData i : blocks.values()) {
-            palette.addIfMissing(i.getAsString());
-        }
-
-        writePaletteAndBlocks(dos, palette);
+        int[] ids = new int[blocks.size()];
+        KList<String> palette = buildPalette(ids, null);
+        writePaletteAndBlocks(dos, palette, ids);
         writeStates(dos);
     }
 
     /**
-     * Shared tail of both write variants. The palette index map replaces an
-     * O(blocks x palette) indexOf scan per block; the emitted bytes are
-     * identical (same palette build order, same lookup results).
+     * First-seen palette over one blocks traversal, recording each block's
+     * palette id at the matching position of {@code ids}. Dedup is a HashMap
+     * probe; this replaces an O(blocks x palette) addIfMissing contains scan
+     * plus the second getAsString pass the write loop used to pay for id
+     * lookup — on the server getAsString allocates a fresh string per call.
+     * The cursor iterator is allocation-free and documented to traverse in
+     * the same order as the write loop's entry iterator. {@code progress},
+     * when given, is incremented once per block so the interactive save Job
+     * keeps its progress accounting.
      */
-    private void writePaletteAndBlocks(DataOutputStream dos, KList<String> palette) throws IOException {
+    private KList<String> buildPalette(int[] ids, int[] progress) {
+        KList<String> palette = new KList<>();
+        HashMap<String, Integer> index = new HashMap<>(64);
+        int k = 0;
+        for (VectorMap<BlockData>.CursorIterator it = blocks.cursorIterator(); it.hasNext(); ) {
+            String s = it.next().value.getAsString();
+            Integer id = index.get(s);
+            if (id == null) {
+                id = palette.size();
+                palette.add(s);
+                index.put(s, id);
+            }
+            ids[k++] = id;
+            if (progress != null) {
+                progress[0]++;
+            }
+        }
+        return palette;
+    }
+
+    /**
+     * Shared tail of both write variants. ids carries each block's palette id
+     * from buildPalette's single traversal (same iteration order as the loop
+     * below — VectorMap traversal is deterministic for an unmodified map), so
+     * no per-block lookup or getAsString is needed here. The emitted bytes
+     * are identical to the historical addIfMissing/indexOf algorithm (same
+     * palette build order, same id per block).
+     */
+    private void writePaletteAndBlocks(DataOutputStream dos, KList<String> palette, int[] ids) throws IOException {
         // writeShort caps the palette at 65535 entries; writing more would
         // silently truncate the count and corrupt the whole file for the
         // reader. Fail loudly instead.
@@ -387,19 +417,15 @@ public class IrisObject extends IrisRegistrant {
             dos.writeUTF(i);
         }
 
-        var index = new java.util.HashMap<String, Integer>(palette.size() * 2);
-        for (int i = 0; i < palette.size(); i++) {
-            index.put(palette.get(i), i);
-        }
-
         dos.writeInt(blocks.size());
 
+        int k = 0;
         for (var entry : blocks) {
             var i = entry.getKey();
             dos.writeShort(i.getBlockX());
             dos.writeShort(i.getBlockY());
             dos.writeShort(i.getBlockZ());
-            dos.writeShort(index.get(entry.getValue().getAsString()));
+            dos.writeShort(ids[k++]);
         }
     }
 
@@ -435,15 +461,13 @@ public class IrisObject extends IrisRegistrant {
                     dos.writeInt(d);
                     dos.writeUTF("Iris V2 IOB;");
 
-                    KList<String> palette = new KList<>();
-
-                    for (BlockData i : blocks.values()) {
-                        palette.addIfMissing(i.getAsString());
-                        ++c;
-                    }
+                    int[] ids = new int[blocks.size()];
+                    int[] built = new int[1];
+                    KList<String> palette = buildPalette(ids, built);
+                    c += built[0];
                     total -= blocks.size() - palette.size();
 
-                    writePaletteAndBlocks(dos, palette);
+                    writePaletteAndBlocks(dos, palette, ids);
                     dos.writeInt(states.size());
                     for (var entry : states) {
                         var i = entry.getKey();
