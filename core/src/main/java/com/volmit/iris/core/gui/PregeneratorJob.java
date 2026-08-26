@@ -32,7 +32,6 @@ import com.volmit.iris.util.function.Consumer2;
 import com.volmit.iris.util.mantle.Mantle;
 import com.volmit.iris.util.math.M;
 import com.volmit.iris.util.math.Position2;
-import com.volmit.iris.util.scheduling.ChronoLatch;
 import com.volmit.iris.util.scheduling.J;
 
 import javax.swing.*;
@@ -65,12 +64,10 @@ public class PregeneratorJob implements PregenListener {
     private final IrisPregenerator pregenerator;
     private final Position2 min;
     private final Position2 max;
-    private final ChronoLatch cl = new ChronoLatch(TimeUnit.MINUTES.toMillis(1));
     private final Engine engine;
     private final ExecutorService service;
     private JFrame frame;
     private PregenRenderer renderer;
-    private int rgc = 0;
     private String[] info;
 
     public PregeneratorJob(PregenTask task, PregeneratorMethod method, Engine engine) {
@@ -270,14 +267,10 @@ public class PregeneratorJob implements PregenListener {
 
     @Override
     public void onRegionGenerated(int x, int z) {
-        shouldGc();
-        rgc++;
-    }
-
-    private void shouldGc() {
-        if (cl.flip() && rgc > 16) {
-            System.gc();
-        }
+        // The forced System.gc() that used to live here (every ~32 regions)
+        // was a band-aid for tectonic-plate residency, whose root cause the
+        // R26 hard cap actually fixed - all it contributed since were
+        // stop-the-world pauses in the middle of pregeneration.
     }
 
     @Override

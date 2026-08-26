@@ -546,6 +546,15 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
             }
         }
 
+        // Same view-scope eviction as the HD tiles above: fastpositions used
+        // to grow without bound while roaming (low-q previews are smaller but
+        // each is still a full BufferedImage).
+        for (BlockPosition i : fastpositions.k()) {
+            if (!gg.contains(i)) {
+                fastpositions.remove(i);
+            }
+        }
+
         hanleFollow();
         renderOverlays(g);
 

@@ -137,6 +137,17 @@ public class NoiseExplorerGUI extends JPanel implements MouseWheelListener, List
         }
         frame.setSize(1440, 820);
         frame.setVisible(true);
+        // Same teardown as the no-arg variant below: HIDE_ON_CLOSE only hides,
+        // and this instance stays registered as a Bukkit listener for the
+        // hotload event - without this the hidden frame and its full-size
+        // backing BufferedImage stay pinned forever.
+        frame.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                Iris.instance.unregisterListener(nv);
+                frame.dispose();
+            }
+        });
     }
 
     private static void createAndShowGUI() {
@@ -175,6 +186,7 @@ public class NoiseExplorerGUI extends JPanel implements MouseWheelListener, List
             @Override
             public void windowClosing(java.awt.event.WindowEvent windowEvent) {
                 Iris.instance.unregisterListener(nv);
+                frame.dispose();
             }
         });
     }
@@ -268,10 +280,14 @@ public class NoiseExplorerGUI extends JPanel implements MouseWheelListener, List
                 img = null;
             }
 
-            if (img == null) {
+            // First paints can run before layout sized the component: a zero
+            // width/height would make BufferedImage's constructor throw and
+            // kill the render loop.
+            if (img == null && w / accuracy > 0 && h / accuracy > 0) {
                 img = new BufferedImage(w / accuracy, h / accuracy, BufferedImage.TYPE_INT_RGB);
             }
 
+            if (img != null) {
             BurstExecutor e = gx.burst(w);
 
             for (int x = 0; x < w / accuracy; x++) {
@@ -296,6 +312,7 @@ public class NoiseExplorerGUI extends JPanel implements MouseWheelListener, List
 
             e.complete();
             gg.drawImage(img, 0, 0, getParent().getWidth() * accuracy, getParent().getHeight() * accuracy, (img, infoflags, x, y, width, height) -> true);
+            }
         }
 
         p.end();
