@@ -1195,6 +1195,15 @@ public class IrisObject extends IrisRegistrant {
                 if (i.getBlockY() != lowest)
                     continue;
 
+                // The value can be shared: palette-resolved loads share one
+                // instance per palette entry, and the stilt palette's aquire
+                // cache hands out the same instance on every pick. Rotation
+                // and the edit-merge below mutate in place, so clone first —
+                // exactly like the main loop (without this, repeated
+                // placements of a cached object rotate its stored blocks
+                // cumulatively and corrupt the shared instances).
+                d = d.clone();
+
                 for (IrisObjectReplace j : config.getEdit()) {
                     if (rng.chance(j.getChance())) {
                         for (BlockData k : j.getFind(rdata)) {

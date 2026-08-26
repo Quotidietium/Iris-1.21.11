@@ -418,6 +418,34 @@ public class B {
         return mat.getMaterial().isSolid();
     }
 
+    /**
+     * Successful parses memoized by (trimmed) input string. Previously every
+     * call re-parsed: the custom map only ever holds third-party provider
+     * registrations, so minecraft:* strings always fell through to
+     * toLowerCase + static synchronized createBlockData. Only non-null
+     * results are cached (a failed lookup may succeed after a provider
+     * registers later); the cache is capped defensively; and
+     * IrisSettings.invalidate() clears it so the preventLeafDecay flag baked
+     * into cached leaves can never go stale. Callers must treat returned
+     * instances as immutable templates — clone before rotate/mirror/merge
+     * (every mutator site was audited to do so; see the stilt path in
+     * IrisObject.place).
+     */
+    private static final KMap<String, BlockData> memo = new KMap<>();
+    private static final int MEMO_LIMIT = 1 << 16;
+
+    /** Called from IrisSettings.invalidate(): settings reload can flip the leaf-decay flag. */
+    public static void invalidateParseMemo() {
+        memo.clear();
+    }
+
+    private static void memoize(String key, BlockData value) {
+        if (memo.size() > MEMO_LIMIT) {
+            memo.clear();
+        }
+        memo.put(key, value);
+    }
+
     public static BlockData getOrNull(String bdxf, boolean warn) {
         try {
             String bd = bdxf.trim();
@@ -426,15 +454,27 @@ public class B {
                 return custom.get(bd);
             }
 
+            BlockData hit = memo.get(bd);
+            if (hit != null) {
+                return hit;
+            }
+
+            String key = bd;
             if (bd.startsWith("minecraft:cauldron[level=")) {
                 bd = bd.replaceAll("\\Q:cauldron[\\E", ":water_cauldron[");
             }
 
             if (bd.equals("minecraft:grass_path")) {
-                return DIRT_PATH.createBlockData();
+                BlockData r = DIRT_PATH.createBlockData();
+                memoize(key, r);
+                return r;
             }
 
             BlockData bdx = parseBlockData(bd, warn);
+
+            if (bdx != null) {
+                memoize(key, bdx);
+            }
 
             if (bdx == null && warn) {
                 if (clw.flip()) {
