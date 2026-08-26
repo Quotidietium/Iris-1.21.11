@@ -1099,6 +1099,32 @@ public final class Benchmark {
                 out.add(ioReadScenario("object-ioread-wide", 150, 80, 25, 96, 2));
             }
 
+            // ---- B.get choke point (block string parse / R34 memo) ----
+            // Every B.get call on a minecraft:* string re-parses: toLowerCase
+            // + static synchronized createBlockData (the custom map only ever
+            // holds third-party provider registrations). String mix mirrors
+            // the io fixtures (stateful variants, proven parseable by the
+            // stub) so before/after A/B isolates the parse-vs-memo-hit cost.
+            {
+                Material[] mats = {Material.STONE, Material.OAK_LOG, Material.OAK_LEAVES,
+                        Material.DIRT, Material.SAND, Material.COBBLESTONE};
+                String[] mix = new String[16];
+                for (int i = 0; i < mix.length; i++) {
+                    mix[i] = "minecraft:" + mats[i % mats.length].name().toLowerCase()
+                            + "[mode=" + (i % 4) + ",variant=" + i + "]";
+                }
+                out.add(sc("bget-parse", (n, seed, dg) -> {
+                    Random r = new Random(seed);
+                    double bh = 0;
+                    for (int i = 0; i < n; i++) {
+                        BlockData v = B.get(mix[r.nextInt(mix.length)]);
+                        dg.add(v.getMaterial().ordinal());
+                        bh += v.getMaterial().ordinal();
+                    }
+                    return bh;
+                }));
+            }
+
             // ---- Decorator path: per-column selection + surface placement ----
             // Real IrisSurfaceDecorator against a JDK-proxy Engine (SeedManager,
             // IrisData on a scratch folder and the dimension POJO are all REAL;
