@@ -790,7 +790,7 @@ public final class Benchmark {
                         for (int i = 0; i < n; i++) {
                             int x = r.nextInt(1 << 20), z = r.nextInt(1 << 20);
                             int ret = tree.place(x, 64, z, placer, placement,
-                                    new RNG(seed + i), (com.volmit.iris.util.math.BlockPosition p, BlockData d) -> {
+                                    new RNG(seed + i), (int px, int py, int pz, BlockData d) -> {
                                     }, null, null);
                             dg.add(ret);
                             bh += ret;
@@ -820,7 +820,7 @@ public final class Benchmark {
                         for (int i = 0; i < n; i++) {
                             int x = r.nextInt(1 << 20), z = r.nextInt(1 << 20);
                             int ret = tree.place(x, 64, z, placer, stiltPlacement,
-                                    new RNG(seed + i), (com.volmit.iris.util.math.BlockPosition p, BlockData d) -> {
+                                    new RNG(seed + i), (int px, int py, int pz, BlockData d) -> {
                                     }, null, null);
                             dg.add(ret);
                             bh += ret;

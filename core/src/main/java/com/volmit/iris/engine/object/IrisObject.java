@@ -614,7 +614,7 @@ public class IrisObject extends IrisRegistrant {
         return place(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), placer, config, rng, rdata);
     }
 
-    public int place(int x, int yv, int z, IObjectPlacer oplacer, IrisObjectPlacement config, RNG rng, BiConsumer<BlockPosition, BlockData> listener, CarveResult c, IrisData rdata) {
+    public int place(int x, int yv, int z, IObjectPlacer oplacer, IrisObjectPlacement config, RNG rng, ObjectPlaceListener listener, CarveResult c, IrisData rdata) {
         IObjectPlacer placer = (config.getHeightmap() != null) ? new HeightmapObjectPlacer(oplacer.getEngine() == null ? IrisContext.get().getEngine() : oplacer.getEngine(), rng, x, yv, z, config, oplacer) : oplacer;
 
         if (rdata != null) {
@@ -932,6 +932,12 @@ public class IrisObject extends IrisRegistrant {
             // reusable key/argument vector — rotate/translate never mutate
             // their argument and reads below stay within the iteration.
             boolean hasStates = !states.isEmpty();
+            // Hoisted once per place: iterating an empty edit list below still
+            // allocated an ArrayList$Itr per block; the isEmpty guard skips
+            // both the iterator and the (rng-free) empty pass — no rng is
+            // consumed for an empty edit list either way.
+            KList<IrisObjectReplace> edits = config.getEdit();
+            boolean hasEdits = !edits.isEmpty();
             BlockVector gVec = new BlockVector();
             for (VectorMap<BlockData>.CursorIterator it = blocks.cursorIterator(); it.hasNext(); ) {
                 VectorMap.Cursor<BlockData> entry = it.next();
@@ -972,20 +978,22 @@ public class IrisObject extends IrisRegistrant {
                     ((Leaves) data).setPersistent(true);
                 }
 
-                for (IrisObjectReplace j : config.getEdit()) {
-                    if (rng.chance(j.getChance())) {
-                        for (BlockData k : j.getFind(rdata)) {
-                            if (j.isExact() ? k.matches(data) : k.getMaterial().equals(data.getMaterial())) {
-                                BlockData newData = j.getReplace(rng, i.getX() + x, i.getY() + y, i.getZ() + z, rdata).clone();
+                if (hasEdits) {
+                    for (IrisObjectReplace j : edits) {
+                        if (rng.chance(j.getChance())) {
+                            for (BlockData k : j.getFind(rdata)) {
+                                if (j.isExact() ? k.matches(data) : k.getMaterial().equals(data.getMaterial())) {
+                                    BlockData newData = j.getReplace(rng, i.getX() + x, i.getY() + y, i.getZ() + z, rdata).clone();
 
-                                if (newData.getMaterial() == data.getMaterial() && !(newData instanceof IrisCustomData || data instanceof IrisCustomData))
-                                    data = data.merge(newData);
-                                else
-                                    data = newData;
+                                    if (newData.getMaterial() == data.getMaterial() && !(newData instanceof IrisCustomData || data instanceof IrisCustomData))
+                                        data = data.merge(newData);
+                                    else
+                                        data = newData;
 
-                                Optional<TileData> t = j.getReplace().getTile(rng, x, y, z, rdata);
-                                if (t.isPresent()) {
-                                    tile = t.get();
+                                    Optional<TileData> t = j.getReplace().getTile(rng, x, y, z, rdata);
+                                    if (t.isPresent()) {
+                                        tile = t.get();
+                                    }
                                 }
                             }
                         }
@@ -1039,7 +1047,7 @@ public class IrisObject extends IrisRegistrant {
                 }
 
                 if (listener != null) {
-                    listener.accept(new BlockPosition(xx, yy, zz), data);
+                    listener.onPlace(xx, yy, zz, data);
                 }
 
                 if (markers != null && markers.containsKey(gVec)) {
