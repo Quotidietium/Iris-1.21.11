@@ -207,13 +207,11 @@ public final class Benchmark {
     }
 
     /**
-     * One .iob write() scenario: a solid sx*sy*sz IrisObject over the given
-     * palette width (all palette entries exercised), serialized to a heap
-     * buffer per op. The digest folds the output length plus every 7th byte
-     * so the scenario doubles as a write-format regression probe; full
-     * byte-identity is proven separately by VerifyObjectIOB.
+     * Builds a solid sx*sy*sz IrisObject over the given palette width (all
+     * palette entries exercised) — shared by the .iob write and read
+     * scenarios so both measure the same object shapes.
      */
-    private static Scenario ioWriteScenario(String name, int sx, int sy, int sz, int paletteSize, int ops) {
+    private static com.volmit.iris.engine.object.IrisObject buildIoObject(int sx, int sy, int sz, int paletteSize) {
         Material[] mats = {Material.STONE, Material.OAK_LOG, Material.OAK_LEAVES,
                 Material.DIRT, Material.SAND, Material.COBBLESTONE};
         BlockData[] palette = new BlockData[paletteSize];
@@ -231,6 +229,17 @@ public final class Benchmark {
                 }
             }
         }
+        return o;
+    }
+
+    /**
+     * One .iob write() scenario: each op fully serializes the object to a
+     * heap buffer. The digest folds the output length plus every 7th byte so
+     * the scenario doubles as a write-format regression probe; full
+     * byte-identity is proven separately by VerifyObjectIOB.
+     */
+    private static Scenario ioWriteScenario(String name, int sx, int sy, int sz, int paletteSize, int ops) {
+        com.volmit.iris.engine.object.IrisObject o = buildIoObject(sx, sy, sz, paletteSize);
         return new Scenario() {
             @Override
             public String name() {
@@ -258,6 +267,62 @@ public final class Benchmark {
                     } catch (java.io.IOException e) {
                         throw new RuntimeException(e);
                     }
+                }
+                return bh;
+            }
+        };
+    }
+
+    /**
+     * One .iob read() scenario: the shared fixture object is serialized once
+     * at setup; each op reads the bytes back into a fresh IrisObject. The
+     * digest folds the full read-back content via the zero-alloc cursor
+     * iterator (coords + material) plus the block count, so the scenario
+     * doubles as a read-path content regression probe — before/after digests
+     * must match bit-for-bit.
+     */
+    private static Scenario ioReadScenario(String name, int sx, int sy, int sz, int paletteSize, int ops) {
+        com.volmit.iris.engine.object.IrisObject fixture = buildIoObject(sx, sy, sz, paletteSize);
+        ByteArrayOutputStream bo = new ByteArrayOutputStream(1 << 16);
+        try {
+            fixture.write(bo);
+        } catch (java.io.IOException e) {
+            throw new RuntimeException(e);
+        }
+        byte[] bytes = bo.toByteArray();
+        return new Scenario() {
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public int ops() {
+                return ops;
+            }
+
+            @Override
+            public double run(int n, long seed, Digest dg) {
+                double bh = 0;
+                for (int i = 0; i < n; i++) {
+                    com.volmit.iris.engine.object.IrisObject t =
+                            new com.volmit.iris.engine.object.IrisObject(0, 0, 0);
+                    try {
+                        t.read(new ByteArrayInputStream(bytes));
+                    } catch (Throwable ex) {
+                        throw new RuntimeException(ex);
+                    }
+                    int sz = 0;
+                    for (var it = t.getBlocks().cursorIterator(); it.hasNext(); ) {
+                        var c = it.next();
+                        dg.add(c.x);
+                        dg.add(c.y);
+                        dg.add(c.z);
+                        dg.add(c.value.getMaterial().ordinal());
+                        sz++;
+                    }
+                    dg.add(sz);
+                    bh += sz;
                 }
                 return bh;
             }
@@ -1018,15 +1083,20 @@ public final class Benchmark {
                 });
             }
 
-            // ---- IrisObject.write: .iob serialization (Studio save + conversions) ----
+            // ---- IrisObject.write/read: .iob serialization (Studio save + conversions + object loading) ----
             // FreshStringBlockData mirrors CraftBlockData: getAsString()
             // allocates a new string per call, so palette dedup and id lookup
             // pay real string-compare costs. Shapes: small = hand-edit scale,
             // large = big structure, wide = conversion-scale palette.
+            // Read scenarios use the same fixtures serialized once — the
+            // object-loader KCache miss path (load storms during pregen).
             {
                 out.add(ioWriteScenario("object-iowrite-small", 40, 25, 10, 12, 40));
                 out.add(ioWriteScenario("object-iowrite-large", 100, 50, 20, 32, 8));
                 out.add(ioWriteScenario("object-iowrite-wide", 150, 80, 25, 96, 2));
+                out.add(ioReadScenario("object-ioread-small", 40, 25, 10, 12, 40));
+                out.add(ioReadScenario("object-ioread-large", 100, 50, 20, 32, 8));
+                out.add(ioReadScenario("object-ioread-wide", 150, 80, 25, 96, 2));
             }
 
             // ---- Decorator path: per-column selection + surface placement ----

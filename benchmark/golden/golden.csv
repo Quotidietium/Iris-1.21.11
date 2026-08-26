@@ -31,6 +31,9 @@ object-place-stilt,a63e81aabd8fe8cd,55300000
 object-iowrite-small,401c691053674275,459960
 object-iowrite-large,7a7e0b9825c787c5,915712
 object-iowrite-wide,2e6c87d48a665775,686762
+object-ioread-small,79f7e72a86abd065,1600040
+object-ioread-large,5c5477640acd43c5,3200008
+object-ioread-wide,c6f32a1f57386e85,2400002
 decorator-select,c2bcb0aa1b184a10,1000000
 decorator-decorate,fc83d90420095461,312304
 deposit-place,b1ef6b06bc1884e5,506928
