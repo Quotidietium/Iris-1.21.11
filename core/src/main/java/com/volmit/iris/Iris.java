@@ -235,6 +235,12 @@ public class Iris extends VolmitPlugin implements Listener {
             downloadToFile(url, f);
         } catch (IOException e) {
             Iris.reportError(e);
+            // Surface the real cause to the console: TLS handshake failures,
+            // timeouts and 404s all used to collapse into the callers'
+            // "Failed to find pack" messages, which points admins at
+            // completely wrong fixes (repo spelling instead of network/TLS).
+            Iris.error("Download failed for " + name + " (" + url + "): "
+                    + e.getClass().getSimpleName() + ": " + e.getMessage());
             return null;
         }
 

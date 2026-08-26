@@ -181,7 +181,7 @@ public class StudioSVC implements IrisService {
             download(sender, repo, branch, trim, forceOverwrite, false);
         } catch (Throwable e) {
             Iris.reportError(e);
-            sender.sendMessage("Failed to download '" + key + "' from " + url + ".");
+            sender.sendMessage("Failed to download '" + key + "' from " + url + ": " + e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 
@@ -190,7 +190,7 @@ public class StudioSVC implements IrisService {
             download(sender, "IrisDimensions", url, trim, forceOverwrite, true);
         } catch (Throwable e) {
             Iris.reportError(e);
-            sender.sendMessage("Failed to download 'IrisDimensions/overworld' from " + url + ".");
+            sender.sendMessage("Failed to download 'IrisDimensions/overworld' from " + url + ": " + e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 
@@ -215,8 +215,11 @@ public class StudioSVC implements IrisService {
         File packs = getWorkspaceFolder();
 
         if (zip == null || !zip.exists()) {
-            sender.sendMessage("Failed to find pack at " + url);
-            sender.sendMessage("Make sure you specified the correct repo and branch!");
+            sender.sendMessage("Failed to download pack at " + url);
+            // zip == null means the download itself failed (see the Download failed error above:
+            // TLS handshake, timeout, 404...); only a missing file WITH a successful download
+            // would be a wrong repo/branch.
+            sender.sendMessage("Check the 'Download failed' error above for the actual cause (network/TLS), or verify the repo and branch!");
             sender.sendMessage("For example: /iris download IrisDimensions/overworld branch=master");
             return;
         }
