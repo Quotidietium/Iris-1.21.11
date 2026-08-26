@@ -100,20 +100,49 @@ public class BurstExecutor {
             return;
         }
 
+        Throwable failure = null;
         synchronized (futures) {
             if (futures.isEmpty()) {
                 return;
             }
 
-            try {
-                for (Future<?> i : futures) {
+            // Join EVERY task before deciding anything: complete() is a stage
+            // barrier (R12) — the shared hunk may only be handed on once all
+            // parallel work finished, including the failing tasks.
+            for (Future<?> i : futures) {
+                try {
                     i.get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    if (failure == null) failure = e;
+                } catch (ExecutionException e) {
+                    if (failure == null) failure = e.getCause();
+                } catch (Throwable t) {
+                    // ForkJoinTask.get() rethrows unchecked task exceptions
+                    // DIRECTLY (reconstructed via reflection, not wrapped in
+                    // ExecutionException like FutureTask does) — they must not
+                    // escape this loop or the barrier and the futures cleanup
+                    // below are skipped.
+                    if (failure == null) failure = t;
                 }
-
-                futures.clear();
-            } catch (InterruptedException | ExecutionException e) {
-                Iris.reportError(e);
             }
+
+            // Always clear: a retried complete() (see Mantle.unloadTectonicPlate's
+            // catch path) must be a no-op, never a re-throw of a stale failure,
+            // and futures from a failed burst must not be re-awaited forever.
+            futures.clear();
+        }
+
+        if (failure != null) {
+            // Report first (callers that catch upstream keep their Sentry
+            // telemetry), then propagate unwrapped — the single-core path has
+            // always thrown from queue(), and swallowing here made multicore
+            // hide generation/unload failures (R26: silent plate-unload stuck
+            // residency).
+            Iris.reportError(failure);
+            if (failure instanceof RuntimeException r) throw r;
+            if (failure instanceof Error er) throw er;
+            throw new RuntimeException(failure);
         }
     }
 }
