@@ -492,7 +492,13 @@ public class Mantle {
         }
 
         double idleDuration = baseIdleDuration;
-        if (loadedRegions.size() > tectonicLimit) {
+        // An explicit zero/negative limit means "no residency": skip the
+        // over-limit idle correction entirely. The old formula divided by the
+        // limit unguarded, so limit=0 produced Infinity (NaN once loaded also
+        // reached 0) and the Math.max floor pinned idleDuration to 4000ms —
+        // trim(0,0)'s "unload everything idle NOW" intent silently became
+        // "unload everything idle for 4+ seconds".
+        if (tectonicLimit > 0 && loadedRegions.size() > tectonicLimit) {
             // todo update this correctly and maybe do something when its above a 100%
             idleDuration = Math.max(idleDuration - (1000 * (((loadedRegions.size() - tectonicLimit) / (double) tectonicLimit) * 100) * 0.4), 4000);
         }
