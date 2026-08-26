@@ -126,7 +126,6 @@ public class IO {
             return bytesToHex(d.digest(b.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         return "¯\\_(ツ)_/¯";
@@ -159,14 +158,12 @@ public class IO {
                     fullTransfer(din, new VoidOutputStream(), 8192);
                 } catch (IOException e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 }
             }
 
             return crc.getValue();
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         return 0;
@@ -216,7 +213,6 @@ public class IO {
             return bytesToHex(din.getMessageDigest().digest());
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         return "¯\\_(ツ)_/¯";
@@ -621,7 +617,7 @@ public class IO {
                 }
             } catch (IOException e) {
                 Iris.error("Failed to copy " + targetPath);
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         });
     }

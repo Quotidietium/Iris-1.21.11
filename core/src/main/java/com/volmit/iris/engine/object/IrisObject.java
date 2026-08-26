@@ -1104,7 +1104,6 @@ public class IrisObject extends IrisRegistrant {
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
             Iris.reportError(e);
         }
         readLock.unlock();

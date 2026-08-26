@@ -193,7 +193,7 @@ public class DeepSearchPregenerator extends Thread implements Listener {
             try {
                 saveNow();
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         });
     }
@@ -247,7 +247,7 @@ public class DeepSearchPregenerator extends Thread implements Listener {
             }.runTaskLater(Iris.instance, 20L);
         } catch (Exception e) {
             Iris.error("Failed to shutdown DeepSearch for " + world.getName());
-            e.printStackTrace();
+            Iris.reportError(e);
         } finally {
             saveNow();
             interrupt();

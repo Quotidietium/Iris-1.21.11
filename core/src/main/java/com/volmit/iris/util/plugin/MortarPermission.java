@@ -38,7 +38,6 @@ public abstract class MortarPermission {
                     i.set(Modifier.isStatic(i.getModifiers()) ? null : this, px);
                 } catch (IllegalArgumentException | IllegalAccessException | InstantiationException |
                          InvocationTargetException | NoSuchMethodException | SecurityException e) {
-                    e.printStackTrace();
                     Iris.reportError(e);
                 }
             }
@@ -53,7 +52,6 @@ public abstract class MortarPermission {
                 try {
                     p.add((MortarPermission) i.get(Modifier.isStatic(i.getModifiers()) ? null : this));
                 } catch (IllegalArgumentException | IllegalAccessException | SecurityException e) {
-                    e.printStackTrace();
                     Iris.reportError(e);
                 }
             }

@@ -18,6 +18,7 @@
 
 package com.volmit.iris.util.hunk.bits;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.function.Consumer2;
 import com.volmit.iris.util.function.Consumer2IO;
@@ -45,7 +46,7 @@ public interface Palette<T> {
             try {
                 c.accept(a, b);
             } catch (IOException e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         });
     }

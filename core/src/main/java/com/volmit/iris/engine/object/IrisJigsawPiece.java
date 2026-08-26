@@ -67,7 +67,6 @@ public class IrisJigsawPiece extends IrisRegistrant {
                 return Math.max(v.getBlockX(), v.getBlockZ());
             } catch (IOException e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
 
             return 0;
@@ -81,7 +80,6 @@ public class IrisJigsawPiece extends IrisRegistrant {
                 return Math.max(Math.max(v.getBlockX(), v.getBlockZ()), v.getBlockY());
             } catch (IOException e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
 
             return -1;

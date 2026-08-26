@@ -226,7 +226,7 @@ public class CommandObject implements DecreeExecutor {
             o.write(o.getLoadFile());
         } catch (IOException e) {
             sender().sendMessage("Failed to save object " + o.getLoadFile() + ": " + e.getMessage());
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -235,7 +235,7 @@ public class CommandObject implements DecreeExecutor {
         try {
             IrisConverter.convertSchematics(sender());
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
 
     }

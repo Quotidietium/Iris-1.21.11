@@ -176,7 +176,7 @@ public class IrisEngineSVC implements IrisService {
 
                     worlds.values().forEach(Registered::update);
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
                 return 1000;
             }
@@ -223,7 +223,6 @@ public class IrisEngineSVC implements IrisService {
                     } catch (Throwable e) {
                         Iris.reportError(e);
                         Iris.error("EngineSVC: Failed to trim for " + name);
-                        e.printStackTrace();
                     }
                 }, offset, TRIM_PERIOD, TimeUnit.MILLISECONDS);
             }
@@ -262,7 +261,6 @@ public class IrisEngineSVC implements IrisService {
                     } catch (Throwable e) {
                         Iris.reportError(e);
                         Iris.error("EngineSVC: Failed to unload for " + name);
-                        e.printStackTrace();
                     }
                 }, offset + TRIM_PERIOD / 2, TRIM_PERIOD, TimeUnit.MILLISECONDS);
             }

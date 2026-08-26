@@ -87,7 +87,7 @@ public class MultiBurst implements ExecutorService {
                                     return worker;
                                 }
                             },
-                            (t, e) -> e.printStackTrace(), true);
+                            (t, e) -> Iris.reportError(e), true);
             dispatcher = ExecutorsKt.from(service);
             return service;
         }
@@ -284,7 +284,6 @@ public class MultiBurst implements ExecutorService {
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
             Iris.reportError(e);
         }
     }

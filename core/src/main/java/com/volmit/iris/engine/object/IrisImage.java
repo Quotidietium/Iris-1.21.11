@@ -136,7 +136,7 @@ public class IrisImage extends IrisRegistrant {
             ImageIO.write(b, "png", at);
             Iris.warn("Debug image written to " + at.getPath() + " for channel " + channel.name());
         } catch (IOException e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 }

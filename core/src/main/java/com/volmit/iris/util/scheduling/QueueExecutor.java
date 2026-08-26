@@ -40,7 +40,6 @@ public class QueueExecutor extends Looper {
                 queue.next().run();
             } catch (Throwable e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
         }
 

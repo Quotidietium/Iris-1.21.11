@@ -32,7 +32,7 @@ public class WasteDetector<T> extends BasicStream<T> {
             for (String i : allAccesses.sortKNumber().reverse()) {
                 Iris.warn("======== " + i + " ========");
                 for (Throwable j : allThrows.get(i)) {
-                    j.printStackTrace();
+                    Iris.reportError(j);
                 }
                 Iris.warn("---------------------------------------------------------");
             }

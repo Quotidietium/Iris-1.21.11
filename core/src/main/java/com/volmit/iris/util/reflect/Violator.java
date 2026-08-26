@@ -183,7 +183,6 @@ public class Violator {
             return (T) co.newInstance(parameters);
         } catch (Exception e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         return null;

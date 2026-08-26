@@ -70,7 +70,6 @@ public class J {
             } catch (Throwable e) {
                 Iris.reportError(e);
                 Iris.error("Failed to run async task");
-                e.printStackTrace();
             }
         });
     }
@@ -82,7 +81,6 @@ public class J {
             } catch (Throwable e) {
                 Iris.reportError(e);
                 Iris.error("Failed to run async task");
-                e.printStackTrace();
             }
         });
     }

@@ -73,7 +73,6 @@ public class IrisSettings {
                 try {
                     IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
                 } catch (JSONException | IOException e) {
-                    e.printStackTrace();
                     Iris.reportError(e);
                 }
             } else {
@@ -83,7 +82,7 @@ public class IrisSettings {
                     try {
                         IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        Iris.reportError(e);
                     }
                 } catch (Throwable ee) {
                     // Iris.reportError(ee); causes a self-reference & stackoverflow
@@ -107,7 +106,6 @@ public class IrisSettings {
         try {
             IO.writeAll(s, new JSONObject(new Gson().toJson(settings)).toString(4));
         } catch (JSONException | IOException e) {
-            e.printStackTrace();
             Iris.reportError(e);
         }
     }

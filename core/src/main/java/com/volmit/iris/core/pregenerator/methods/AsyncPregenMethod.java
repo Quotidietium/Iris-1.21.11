@@ -84,7 +84,7 @@ public class AsyncPregenMethod implements PregeneratorMethod {
                 world.save();
             }).get();
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -159,7 +159,6 @@ public class AsyncPregenMethod implements PregeneratorMethod {
                 Iris.warn("For more information see https://docs.papermc.io/paper/reference/global-configuration#chunk_system_worker_threads");
                 if (e instanceof InvocationTargetException) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 }
             }
             return 0;
@@ -178,7 +177,6 @@ public class AsyncPregenMethod implements PregeneratorMethod {
             } catch (Throwable e) {
                 Iris.reportError(e);
                 Iris.error("Failed to reset worker threads");
-                e.printStackTrace();
             }
             return i;
         });
@@ -206,7 +204,6 @@ public class AsyncPregenMethod implements PregeneratorMethod {
                 } catch (InterruptedException ignored) {
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 } finally {
                     semaphore.release();
                 }
@@ -225,7 +222,6 @@ public class AsyncPregenMethod implements PregeneratorMethod {
             PaperLib.getChunkAtAsync(world, x, z, true, urgent)
                     .exceptionally(e -> {
                         Iris.reportError(e);
-                        e.printStackTrace();
                         return null;
                     })
                     .thenAccept(i -> {

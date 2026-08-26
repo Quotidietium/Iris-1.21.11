@@ -193,7 +193,6 @@ public class JigsawEditor implements Listener {
             IO.writeAll(targetSaveLocation, j.toString(4));
         } catch (IOException e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
     }
 
@@ -210,7 +209,7 @@ public class JigsawEditor implements Listener {
                 f.get();
             }
         } catch (InterruptedException | ExecutionException e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
         editors.remove(player);
     }

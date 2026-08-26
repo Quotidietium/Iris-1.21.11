@@ -31,7 +31,7 @@ public class Agent {
             Iris.info("Installing Java Agent...");
             ByteBuddyAgent.attach(AGENT_JAR, ByteBuddyAgent.ProcessProvider.ForCurrentVm.INSTANCE);
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
         return doGetInstrumentation() != null;
     }

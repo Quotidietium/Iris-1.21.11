@@ -18,6 +18,7 @@
 
 package com.volmit.iris.util.io;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.util.math.RNG;
 
 import java.io.File;
@@ -28,7 +29,7 @@ public class InstanceState {
         try {
             return Integer.parseInt(IO.readAll(instanceFile()).trim());
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
 
         return -1;
@@ -38,7 +39,7 @@ public class InstanceState {
         try {
             IO.writeAll(instanceFile(), RNG.r.imax() + "");
         } catch (IOException e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 

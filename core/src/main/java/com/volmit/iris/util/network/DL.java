@@ -18,6 +18,7 @@
 
 package com.volmit.iris.util.network;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.util.collection.KSet;
 import com.volmit.iris.util.io.IO;
 import com.volmit.iris.util.scheduling.ChronoLatch;
@@ -269,7 +270,7 @@ public abstract class DL {
                 try {
                     Thread.sleep(40);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
 
                 return IO.transfer(in, o, 8192, mbps / 20);

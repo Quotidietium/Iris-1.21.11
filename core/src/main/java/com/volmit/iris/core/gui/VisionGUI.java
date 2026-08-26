@@ -107,7 +107,7 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
         t.setUncaughtExceptionHandler((et, e) ->
         {
             Iris.info("Exception encountered in " + et.getName());
-            e.printStackTrace();
+            Iris.reportError(e);
         });
 
         return t;
@@ -121,7 +121,7 @@ public class VisionGUI extends JPanel implements MouseWheelListener, KeyListener
         t.setUncaughtExceptionHandler((et, e) ->
         {
             Iris.info("Exception encountered in " + et.getName());
-            e.printStackTrace();
+            Iris.reportError(e);
         });
 
         return t;

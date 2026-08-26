@@ -39,7 +39,6 @@ public abstract class Looper extends Thread {
                 break;
             } catch (Throwable e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
         }
 

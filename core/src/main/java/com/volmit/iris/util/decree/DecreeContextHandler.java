@@ -33,7 +33,6 @@ public interface DecreeContextHandler<T> {
                     -> contextHandlers.put(((DecreeContextHandler<?>) i).getType(), (DecreeContextHandler<?>) i));
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         return contextHandlers;

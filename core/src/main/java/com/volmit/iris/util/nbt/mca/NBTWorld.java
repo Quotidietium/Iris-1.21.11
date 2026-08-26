@@ -144,7 +144,7 @@ public class NBTWorld {
                 Iris.info("Still Waiting to save MCA Files...");
             }
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -205,7 +205,7 @@ public class NBTWorld {
             Iris.debug("Saved Region " + C.GOLD + x + " " + z);
         } catch (IOException e) {
             Iris.error("Failed to save region " + getRegionFile(x, z).getPath());
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -215,7 +215,7 @@ public class NBTWorld {
             Iris.debug("Saved Region " + C.GOLD + x + " " + z);
         } catch (IOException e) {
             Iris.error("Failed to save region " + getRegionFile(x, z).getPath());
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 

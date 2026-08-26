@@ -52,7 +52,6 @@ public class EngineData {
             IO.writeAll(f, new Gson().toJson(this));
         } catch (IOException e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
     }
 }

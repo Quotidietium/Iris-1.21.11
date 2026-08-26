@@ -96,7 +96,7 @@ public class IrisMatter extends IrisRegistrant implements Matter {
         try {
             return slice.getClass().getConstructor(int.class, int.class, int.class).newInstance(getWidth(), getHeight(), getDepth());
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
 
         return null;

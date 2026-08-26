@@ -91,7 +91,6 @@ public class GroupedExecutor {
                 r.run();
             } catch (Throwable e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
 
             mirror.computeIfPresent(q, (k, v) -> v - 1);

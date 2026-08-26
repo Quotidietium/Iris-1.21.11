@@ -95,7 +95,7 @@ public class IrisPackBenchmarking {
                 Iris.info("Finished generating a report!");
             } catch (IOException e) {
                 Iris.error("An error occurred writing to the file.");
-                e.printStackTrace();
+                Iris.reportError(e);
             }
 
             J.s(() -> {
@@ -108,7 +108,7 @@ public class IrisPackBenchmarking {
             stopwatch.end();
         } catch (Exception e) {
             Iris.error("Something has gone wrong!");
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 

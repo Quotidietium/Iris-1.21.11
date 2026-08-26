@@ -52,7 +52,7 @@ public class MedievalPregenMethod implements PregeneratorMethod {
             try {
                 i.get();
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
 
@@ -77,7 +77,7 @@ public class MedievalPregenMethod implements PregeneratorMethod {
                 world.save();
             }).get();
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 

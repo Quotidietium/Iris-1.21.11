@@ -508,7 +508,7 @@ public class B {
                 try {
                     bx = createBlockData(ix.toLowerCase(), warn);
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             }
 

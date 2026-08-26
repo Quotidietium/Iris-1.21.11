@@ -277,7 +277,7 @@ public class CommandIris implements DecreeExecutor {
             }
         } catch (IOException e) {
             sender().sendMessage(C.RED + "Failed to save bukkit.yml because of " + e.getMessage());
-            e.printStackTrace();
+            Iris.reportError(e);
         }
         IrisToolbelt.evacuate(world, "Deleting world");
         deletingWorld = true;
@@ -473,7 +473,7 @@ public class CommandIris implements DecreeExecutor {
             sender().sendMessage(C.GREEN + "World unloaded successfully.");
         } catch (Exception e) {
             sender().sendMessage(C.RED + "Failed to unload the world: " + e.getMessage());
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -536,7 +536,7 @@ public class CommandIris implements DecreeExecutor {
                 Iris.info("Registered \"" + world + "\" in bukkit.yml");
             } catch (IOException e) {
                 Iris.error("Failed to update bukkit.yml!");
-                e.printStackTrace();
+                Iris.reportError(e);
                 return;
             }
         }

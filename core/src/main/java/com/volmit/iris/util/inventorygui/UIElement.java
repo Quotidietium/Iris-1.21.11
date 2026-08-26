@@ -167,8 +167,6 @@ public class UIElement implements Element {
             Iris.reportError(e);
 
         } catch (Throwable e) {
-            Iris.reportError(e);
-            e.printStackTrace();
         }
 
         return this;
@@ -219,7 +217,6 @@ public class UIElement implements Element {
             return is;
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         return null;

@@ -1,5 +1,6 @@
 package com.volmit.iris.util.uniques;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.engine.object.NoiseStyle;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.collection.KMap;
@@ -271,7 +272,7 @@ public class UniqueRenderer {
         try {
             renderFrameBuffer(id, t).export(destination);
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 

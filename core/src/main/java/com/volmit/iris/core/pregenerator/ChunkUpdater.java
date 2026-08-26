@@ -109,7 +109,6 @@ public class ChunkUpdater {
                     }
                 } catch (Exception e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 }
             }, 0, 3, TimeUnit.SECONDS);
             scheduler.scheduleAtFixedRate(() -> {
@@ -128,7 +127,7 @@ public class ChunkUpdater {
 
             Iris.service(PreservationSVC.class).register(t);
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -272,7 +271,6 @@ public class ChunkUpdater {
             }).get();
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
     }
 

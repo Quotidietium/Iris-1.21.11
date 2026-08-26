@@ -94,7 +94,7 @@ public class IrisCavePlacer implements IRare {
         try {
              cave.generate(mantle, rng, base, engine, x + rng.nextInt(15), y, z + rng.nextInt(15), recursion, waterHint, breakSurface);
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
             fail.set(true);
         }
     }

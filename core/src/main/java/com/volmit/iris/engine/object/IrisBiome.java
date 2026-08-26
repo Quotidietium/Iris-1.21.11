@@ -437,7 +437,6 @@ public class IrisBiome extends IrisRegistrant implements IRare {
                     data.add(layer.get(lrng, (wx + j) / zoom, j, (wz - j) / zoom, rdata));
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 }
             }
 
@@ -489,7 +488,6 @@ public class IrisBiome extends IrisRegistrant implements IRare {
                     data.add(layer.get(lrng, (wx + j) / zoom, j, (wz - j) / zoom, rdata));
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 }
             }
 
@@ -541,7 +539,6 @@ public class IrisBiome extends IrisRegistrant implements IRare {
                     data.add(getLayers().get(i).get(random.nextParallelRNG(i + j), (wx + j) / layers.get(i).getZoom(), j, (wz - j) / layers.get(i).getZoom(), rdata));
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 }
             }
         }
@@ -629,7 +626,6 @@ public class IrisBiome extends IrisRegistrant implements IRare {
                     data.add(layer.get(lrng, (wx + j) / zoom, j, (wz - j) / zoom, rdata));
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 }
             }
 

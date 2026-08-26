@@ -687,7 +687,6 @@ public class SchemaBuilder {
                     a.put(j);
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 }
             } else {
                 a.put(function.apply(gg));

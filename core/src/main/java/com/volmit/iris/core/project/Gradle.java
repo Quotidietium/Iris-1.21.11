@@ -25,7 +25,6 @@ public class Gradle {
             runGradle(projectDir, "wrapper");
         } catch (Throwable e) {
             Iris.error("Failed to install gradle wrapper!");
-            e.printStackTrace();
             Iris.reportError(e);
         }
     }

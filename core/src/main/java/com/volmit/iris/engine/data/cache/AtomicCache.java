@@ -77,7 +77,7 @@ public class AtomicCache<T> {
             try {
                 return t.get();
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
                 return null;
             }
         });
@@ -109,7 +109,7 @@ public class AtomicCache<T> {
             }
         } catch (Throwable e) {
             Iris.error("Atomic cache failure!");
-            e.printStackTrace();
+            Iris.reportError(e);
         }
 
         lock.unlock();

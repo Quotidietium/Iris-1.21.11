@@ -46,7 +46,6 @@ public class IrisWorlds {
                 return new IrisWorlds(Objects.requireNonNullElseGet(worlds, KMap::new));
             } catch (Throwable e) {
                 Iris.error("Failed to load worlds.json!");
-                e.printStackTrace();
                 Iris.reportError(e);
             }
 
@@ -96,7 +95,6 @@ public class IrisWorlds {
             dirty = false;
         } catch (IOException e) {
             Iris.error("Failed to save worlds.json!");
-            e.printStackTrace();
             Iris.reportError(e);
         }
     }

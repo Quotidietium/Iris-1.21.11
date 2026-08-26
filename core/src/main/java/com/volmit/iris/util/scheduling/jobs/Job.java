@@ -75,7 +75,6 @@ public interface Job {
             J.car(c);
             if (ff != null) {
                 Iris.reportError(ff);
-                ff.printStackTrace();
                 if (!silentMsg) {
                     sender.sendMessage(C.RED + "Failed " + getName() + " after " + Form.duration(p.getMilliseconds(), 1));
                 }
@@ -87,7 +86,6 @@ public interface Job {
             } catch (Throwable e) {
                 // never let a callback failure vanish into the ignored future
                 Iris.reportError(e);
-                e.printStackTrace();
             }
         });
     }

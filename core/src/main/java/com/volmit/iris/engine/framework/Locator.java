@@ -18,6 +18,7 @@
 
 package com.volmit.iris.engine.framework;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.core.IrisSettings;
 import com.volmit.iris.core.nms.container.BlockPos;
 import com.volmit.iris.core.nms.container.Pair;
@@ -142,7 +143,7 @@ public interface Locator<T> {
                             (at.getZ() << 4) + 8));
                 }
             } catch (WrongEngineBroException | InterruptedException | ExecutionException e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }) {
             @Override

@@ -449,7 +449,6 @@ public class IrisDimension extends IrisRegistrant {
                             IO.writeAll(output, json);
                         } catch (IOException e) {
                             Iris.reportError(e);
-                            e.printStackTrace();
                         }
                     }
                 });
@@ -483,7 +482,6 @@ public class IrisDimension extends IrisRegistrant {
                 IO.writeAll(output, json);
             } catch (IOException e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
         }
     }
@@ -527,7 +525,6 @@ public class IrisDimension extends IrisRegistrant {
                 IO.writeAll(mcm, raw);
             } catch (IOException e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
             Iris.verbose("    Installing Data Pack MCMeta: " + mcm.getPath());
         }
@@ -543,7 +540,6 @@ public class IrisDimension extends IrisRegistrant {
                 IO.writeAll(dimTypeVanilla, json);
             } catch (IOException e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
         }
     }

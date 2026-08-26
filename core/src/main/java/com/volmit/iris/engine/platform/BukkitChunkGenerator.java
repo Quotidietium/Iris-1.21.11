@@ -130,7 +130,6 @@ public class BukkitChunkGenerator extends ChunkGenerator implements PlatformChun
         } catch (Throwable e) {
             Iris.reportError(e);
             Iris.error("Failed to inject biome source into " + world.getName());
-            e.printStackTrace();
         }
         spawnChunks.complete(INMS.get().getSpawnChunkCount(world));
         Iris.instance.unregisterListener(this);
@@ -252,7 +251,7 @@ public class BukkitChunkGenerator extends ChunkGenerator implements PlatformChun
         } catch (Throwable e) {
             loadLock.release();
             Iris.error("======================================");
-            e.printStackTrace();
+            Iris.reportError(e);
             Iris.reportErrorChunk(x, z, e, "CHUNK");
             Iris.error("======================================");
 
@@ -372,7 +371,7 @@ public class BukkitChunkGenerator extends ChunkGenerator implements PlatformChun
             Iris.debug("Generated " + x + " " + z);
         } catch (Throwable e) {
             Iris.error("======================================");
-            e.printStackTrace();
+            Iris.reportError(e);
             Iris.reportErrorChunk(x, z, e, "CHUNK");
             Iris.error("======================================");
 

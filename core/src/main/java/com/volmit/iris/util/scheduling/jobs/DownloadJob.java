@@ -63,7 +63,6 @@ public class DownloadJob implements Job {
             }
         } catch (IOException e) {
             Iris.reportError(e);
-            e.printStackTrace();
             download.fail();
         }
 

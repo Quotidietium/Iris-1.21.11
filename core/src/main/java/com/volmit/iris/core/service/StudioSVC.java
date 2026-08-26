@@ -126,14 +126,12 @@ public class StudioSVC implements IrisService {
                     try {
                         FileUtils.copyFile(i, new File(folder, i.getName()));
                     } catch (IOException e) {
-                        e.printStackTrace();
                         Iris.reportError(e);
                     }
                 } else {
                     try {
                         FileUtils.copyDirectory(i, new File(folder, i.getName()));
                     } catch (IOException e) {
-                        e.printStackTrace();
                         Iris.reportError(e);
                     }
                 }
@@ -183,7 +181,6 @@ public class StudioSVC implements IrisService {
             download(sender, repo, branch, trim, forceOverwrite, false);
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
             sender.sendMessage("Failed to download '" + key + "' from " + url + ".");
         }
     }
@@ -193,7 +190,6 @@ public class StudioSVC implements IrisService {
             download(sender, "IrisDimensions", url, trim, forceOverwrite, true);
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
             sender.sendMessage("Failed to download 'IrisDimensions/overworld' from " + url + ".");
         }
     }
@@ -229,7 +225,6 @@ public class StudioSVC implements IrisService {
             ZipUtil.unpack(zip, work);
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
             sender.sendMessage(
                     """
                             Issue when unpacking. Please check/do the following:
@@ -351,7 +346,6 @@ public class StudioSVC implements IrisService {
         } catch (Exception e) {
             Iris.reportError(e);
             sender.sendMessage("Error when creating studio world:");
-            e.printStackTrace();
         }
     }
 
@@ -402,7 +396,6 @@ public class StudioSVC implements IrisService {
             FileUtils.copyDirectory(importPack, newPack, pathname -> !pathname.getAbsolutePath().contains(".git"), false);
         } catch (IOException e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         new File(importPack, existingPack + ".code-workspace").delete();
@@ -413,7 +406,6 @@ public class StudioSVC implements IrisService {
             FileUtils.copyFile(dimFile, newDimFile);
         } catch (IOException e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         new File(newPack, "dimensions/" + existingPack + ".json").delete();
@@ -427,7 +419,6 @@ public class StudioSVC implements IrisService {
             }
         } catch (JSONException | IOException e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         try {
@@ -436,7 +427,6 @@ public class StudioSVC implements IrisService {
             IO.writeAll(getWorkspaceFile(newName, newName + ".code-workspace"), ws.toString(0));
         } catch (JSONException | IOException e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
     }
 

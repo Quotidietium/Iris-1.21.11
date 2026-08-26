@@ -18,6 +18,7 @@
 
 package com.volmit.iris.util.stream.utility;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.util.stream.BasicStream;
 import com.volmit.iris.util.stream.ProceduralStream;
 
@@ -49,7 +50,7 @@ public class SemaphoreStream<T> extends BasicStream<T> {
             semaphore.release();
             return t;
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
 
         return null;
@@ -63,7 +64,7 @@ public class SemaphoreStream<T> extends BasicStream<T> {
             semaphore.release();
             return t;
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
 
         return null;

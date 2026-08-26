@@ -176,7 +176,6 @@ public class IrisProject {
                         IO.writeAll(ff, createCodeWorkspaceConfig());
                     } catch (IOException e1) {
                         Iris.reportError(e1);
-                        e1.printStackTrace();
                     }
                     updateWorkspace();
                     if (!doOpenVSCode(f)) {
@@ -185,7 +184,6 @@ public class IrisProject {
                 }
             } catch (Throwable e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
         });
     }
@@ -238,7 +236,7 @@ public class IrisProject {
                         .create().getGenerator();
                 onDone.accept(activeProvider.getTarget().getWorld().realWorld());
             } catch (IrisException e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
 
             openVSCode(sender);
@@ -279,7 +277,6 @@ public class IrisProject {
                 IO.writeAll(ws, createCodeWorkspaceConfig());
             } catch (IOException e1) {
                 Iris.reportError(e1);
-                e1.printStackTrace();
             }
         }
 
@@ -343,11 +340,11 @@ public class IrisProject {
                     try {
                         IO.writeAll(a, new SchemaBuilder(i, dm).construct().toString(4));
                     } catch (Throwable e) {
-                        e.printStackTrace();
+                        Iris.reportError(e);
                     }
                 });
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
 
@@ -570,7 +567,6 @@ public class IrisProject {
             return p;
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
         sender.sendMessage("Failed!");
         return null;
@@ -603,7 +599,7 @@ public class IrisProject {
                                 "'><red>- IOB " + f.getName() + " is not 3D!");
                     }
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             }
 

@@ -343,7 +343,7 @@ public class VirtualDecreeCommand {
             } catch (DecreeParsingException e) {
                 Iris.debug("Can't parse parameter value for " + key + "=" + value + " in " + getPath() + " using handler " + param.getHandler().getClass().getSimpleName());
                 sender.sendMessage(C.RED + "Cannot convert \"" + value + "\" into a " + param.getType().getSimpleName());
-                e.printStackTrace();
+                Iris.reportError(e);
                 return null;
             }
         }
@@ -363,7 +363,7 @@ public class VirtualDecreeCommand {
                 } catch (DecreeParsingException e) {
                     Iris.debug("Can't parse parameter value for " + par.getName() + "=" + stringParam + " in " + getPath() + " using handler " + par.getHandler().getClass().getSimpleName());
                     sender.sendMessage(C.RED + "Cannot convert \"" + stringParam + "\" into a " + par.getType().getSimpleName());
-                    e.printStackTrace();
+                    Iris.reportError(e);
                     return null;
                 }
             } catch (IndexOutOfBoundsException e) {
@@ -476,7 +476,7 @@ public class VirtualDecreeCommand {
                     Iris.debug("Parameter \"" + i.getName() + "\" is using default value \"" + i.getParam().defaultValue() + "\"");
                     value = i.getDefaultValue();
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             }
 
@@ -499,7 +499,6 @@ public class VirtualDecreeCommand {
                     getNode().getMethod().invoke(getNode().getInstance(), params);
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                     sender.sendMessage(C.RED + "Command failed: " + e.getClass().getSimpleName() + " (see console for details)");
                 } finally {
                     DecreeContext.remove();

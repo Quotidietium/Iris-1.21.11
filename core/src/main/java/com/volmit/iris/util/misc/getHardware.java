@@ -1,6 +1,7 @@
 package com.volmit.iris.util.misc;
 
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.format.C;
 import com.volmit.iris.util.format.Form;
@@ -52,7 +53,7 @@ public class getHardware {
             String cpuModel = processor.getProcessorIdentifier().getName();
             return cpuModel.isEmpty() ? "Unknown CPU Model" : cpuModel;
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
             return "Unknown CPU Model";
         }
     }
@@ -66,7 +67,7 @@ public class getHardware {
             temps.add("Fan Speeds: " + Arrays.toString(systemInfo.getHardware().getSensors().getFanSpeeds()));
             return temps.copy();
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
         return null;
     }
@@ -82,7 +83,7 @@ public class getHardware {
             }
             return gpus.copy();
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
         return null;
     }
@@ -116,7 +117,7 @@ public class getHardware {
             }
             return systemDisks.copy();
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
         return null;
     }
@@ -139,7 +140,7 @@ public class getHardware {
             }
             return systemPowerSources.copy();
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
         return null;
     }
@@ -158,7 +159,7 @@ public class getHardware {
             }
             return systemEDID.copy();
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
         return null;
     }
@@ -176,7 +177,7 @@ public class getHardware {
                 return interfaces.copy();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
         return null;
     }

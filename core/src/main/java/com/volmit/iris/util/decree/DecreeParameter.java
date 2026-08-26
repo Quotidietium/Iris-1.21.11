@@ -18,6 +18,7 @@
 
 package com.volmit.iris.util.decree;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.engine.data.cache.AtomicCache;
 import com.volmit.iris.util.collection.KList;
 import com.volmit.iris.util.decree.annotations.Param;
@@ -50,7 +51,7 @@ public class DecreeParameter {
 
                 return param.customHandler().getConstructor().newInstance();
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
 
             return null;

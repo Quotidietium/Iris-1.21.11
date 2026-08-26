@@ -18,6 +18,7 @@
 
 package com.volmit.iris.util.cache;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.util.hunk.bits.Writable;
 
 import java.io.DataOutputStream;
@@ -56,7 +57,7 @@ public interface ArrayCache<T> extends Writable<T> {
         try {
             return get((zigZag(y, getHeight()) * getWidth()) + zigZag(x, getWidth()));
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
             throw e;
         }
     }

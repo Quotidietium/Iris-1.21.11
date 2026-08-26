@@ -74,7 +74,6 @@ public class JarScanner {
                     } catch (Throwable e) {
                         if (!report) continue;
                         Iris.reportError(e);
-                        e.printStackTrace();
                     }
                 }
             }
@@ -98,7 +97,6 @@ public class JarScanner {
                     } catch (Throwable e) {
                         if (!report) continue;
                         Iris.reportError(e);
-                        e.printStackTrace();
                     }
                 }
             }

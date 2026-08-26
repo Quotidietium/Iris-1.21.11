@@ -460,7 +460,6 @@ public class Mantle {
             } catch (Throwable e) {
                 Iris.error("Failed to write Tectonic Plate " + C.DARK_GREEN + Cache.keyX(i) + " " + Cache.keyZ(i));
                 Iris.reportError(e);
-                e.printStackTrace();
             }
         }));
         loadedRegions.clear();
@@ -614,7 +613,6 @@ public class Mantle {
             burst.complete();
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
             burst.complete();
         } finally {
             ioTectonicUnload.release(LOCK_SIZE);
@@ -640,7 +638,7 @@ public class Mantle {
                 try {
                     return getSafe(x, z).get();
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             } else {
                 Long key = key(x, z);
@@ -659,10 +657,8 @@ public class Mantle {
                 Iris.reportError(e);
             } catch (ExecutionException e) {
                 Iris.warn("Failed to get Tectonic Plate " + x + " " + z + " Due to a thread execution exception (engine close?)");
-                Iris.reportError(e);
             } catch (Throwable e) {
                 Iris.warn("Failed to get Tectonic Plate " + x + " " + z + " Due to a unknown exception");
-                Iris.reportError(e);
             }
         } finally {
             if (trim) ioTrim.release();
@@ -689,8 +685,6 @@ public class Mantle {
                         Iris.reportError(e);
                     } else {
                         Iris.warn("Failed to get Tectonic Plate " + x + " " + z + " Due to a unknown exception");
-                        Iris.reportError(e);
-                        e.printStackTrace();
                     }
                     return null;
                 })
@@ -705,7 +699,7 @@ public class Mantle {
             return getSafe(x, z)
                     .thenApply(release)
                     .exceptionallyCompose(e -> {
-                        e.printStackTrace();
+                        Iris.reportError(e);
                         return fallback.get();
                     });
         }
@@ -755,7 +749,7 @@ public class Mantle {
                     Iris.error("Failed to read Tectonic Plate " + file.getAbsolutePath() + " creating a new chunk instead.");
                     Iris.reportError(e);
                     if (!(e instanceof EOFException)) {
-                        e.printStackTrace();
+                        Iris.reportError(e);
                     }
                     Iris.panic();
                     region = new TectonicPlate(worldHeight, x, z);

@@ -145,7 +145,6 @@ public class TurboPregenerator extends Thread implements Listener {
                 tick();
             } catch (Throwable e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
         }
 
@@ -257,7 +256,7 @@ public class TurboPregenerator extends Thread implements Listener {
                     queue.remove(c);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
     }
@@ -304,7 +303,7 @@ public class TurboPregenerator extends Thread implements Listener {
             try {
                 saveNow();
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         });
     }
@@ -357,7 +356,7 @@ public class TurboPregenerator extends Thread implements Listener {
             });
         } catch (Exception e) {
             Iris.error("Failed to shutdown turbogen for " + world.getName());
-            e.printStackTrace();
+            Iris.reportError(e);
         } finally {
             saveNow();
             interrupt();

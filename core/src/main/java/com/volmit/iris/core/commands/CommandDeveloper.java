@@ -146,7 +146,7 @@ public class CommandDeveloper implements DecreeExecutor {
                                     completeWork();
                                 } catch (IOException e) {
                                     Iris.error("Failed to write object " + obj.getLoadKey());
-                                    e.printStackTrace();
+                                    Iris.reportError(e);
                                     return new IrisPosition();
                                 }
 
@@ -161,7 +161,7 @@ public class CommandDeveloper implements DecreeExecutor {
                                 IO.writeAll(piece.getLoadFile(), dm.getGson().toJson(piece));
                             } catch (IOException e) {
                                 Iris.error("Failed to write jigsaw piece " + piece.getLoadKey());
-                                e.printStackTrace();
+                                Iris.reportError(e);
                             }
                         });
 
@@ -186,7 +186,7 @@ public class CommandDeveloper implements DecreeExecutor {
                                 changed.incrementAndGet();
                             } catch (IOException e) {
                                 Iris.error("Failed to write object " + obj.getLoadKey());
-                                e.printStackTrace();
+                                Iris.reportError(e);
                             }
                         });
             }
@@ -224,7 +224,7 @@ public class CommandDeveloper implements DecreeExecutor {
             try (var in = CountingDataInputStream.wrap(new BufferedInputStream(new FileInputStream(base)))) {
                 new TectonicPlate(1088, in, true);
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         } else Matter.read(section);
         if (!TectonicPlate.hasError())
@@ -272,7 +272,7 @@ public class CommandDeveloper implements DecreeExecutor {
             pw.close();
             Iris.info("DUMPED! See " + fi.getAbsolutePath());
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -351,7 +351,7 @@ public class CommandDeveloper implements DecreeExecutor {
                 IO.writeAll(snippetFile, gson.toJson(obj));
             } catch (IOException e) {
                 sender().sendMessage(C.RED + "Failed to generate snippet for " + key);
-                e.printStackTrace();
+                Iris.reportError(e);
                 return;
             }
 
@@ -390,7 +390,7 @@ public class CommandDeveloper implements DecreeExecutor {
             try {
                 IO.writeAll(out, gson.toJson(obj));
             } catch (IOException e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         });
 
@@ -429,7 +429,7 @@ public class CommandDeveloper implements DecreeExecutor {
                 MCAFile MCARegion = MCAUtil.read(mca);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
 
     }
@@ -489,7 +489,7 @@ public class CommandDeveloper implements DecreeExecutor {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -545,7 +545,7 @@ public class CommandDeveloper implements DecreeExecutor {
                     sender.sendMessage(algorithm + " Took " + d2/amount + "ms to read");
                     sender.sendMessage(algorithm + " Took " + d1/amount + "ms to write");
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             });
             service.shutdown();

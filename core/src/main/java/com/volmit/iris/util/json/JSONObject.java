@@ -1085,7 +1085,6 @@ public class JSONObject {
             Iris.reportError(e);
             return defaultValue;
         } catch (NullPointerException e) {
-            Iris.reportError(e);
             return defaultValue;
         }
     }

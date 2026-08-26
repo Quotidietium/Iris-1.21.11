@@ -223,7 +223,6 @@ public class IrisData implements ExclusionStrategy, TypeAdapterFactory {
             }
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         return null;
@@ -275,7 +274,7 @@ public class IrisData implements ExclusionStrategy, TypeAdapterFactory {
                 try {
                     throw new RuntimeException();
                 } catch (Throwable ex) {
-                    ex.printStackTrace();
+                    Iris.reportError(ex);
                 }
             }
 
@@ -299,7 +298,7 @@ public class IrisData implements ExclusionStrategy, TypeAdapterFactory {
             }
         } catch (Throwable e) {
             Iris.error("Failed to preprocess object!");
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -339,7 +338,6 @@ public class IrisData implements ExclusionStrategy, TypeAdapterFactory {
             return r;
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
             Iris.error("Failed to create loader! " + registrant.getCanonicalName());
         }
 
@@ -550,7 +548,7 @@ public class IrisData implements ExclusionStrategy, TypeAdapterFactory {
                         .map(s -> s.split("\\Q.\\E")[0])
                         .forEach(s -> l.add("snippet/" + s));
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
 
             return l;

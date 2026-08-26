@@ -76,7 +76,7 @@ public class IrisExpression extends IrisRegistrant {
                 scope.addInvocationVariable("y");
                 scope.addInvocationVariable("z");
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
                 Iris.error("Script Variable load error in " + getLoadFile().getPath());
             }
 
@@ -89,7 +89,7 @@ public class IrisExpression extends IrisRegistrant {
             try {
                 return parser.parse(getExpression(), scope);
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
                 Iris.error("Script load error in " + getLoadFile().getPath());
             }
 

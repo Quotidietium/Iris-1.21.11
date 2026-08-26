@@ -71,7 +71,6 @@ public class INMS {
         } catch (Throwable e) {
             Iris.reportError(e);
             Iris.error("Failed to determine server nms version!");
-            e.printStackTrace();
         }
 
         return "BUKKIT";
@@ -91,7 +90,6 @@ public class INMS {
                 }
             } catch (Throwable e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
         } catch (ClassNotFoundException|NoClassDefFoundError classNotFoundException) {}
 

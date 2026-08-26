@@ -95,7 +95,6 @@ public class MantleChunk extends FlaggedChunk {
                 Iris.addPanic("read.byte.range", start + " " + end);
                 Iris.addPanic("read.byte.current", din.count() + "");
                 Iris.reportError(e);
-                e.printStackTrace();
                 Iris.panic();
 
                 din.skipTo(end);

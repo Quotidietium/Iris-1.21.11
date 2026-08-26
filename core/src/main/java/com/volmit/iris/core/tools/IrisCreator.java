@@ -220,7 +220,7 @@ public class IrisCreator {
                 ff.get();
                 dx.set(true);
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
         return world;
@@ -237,7 +237,7 @@ public class IrisCreator {
                 Iris.info("Registered \"" + name + "\" in bukkit.yml");
             } catch (IOException e) {
                 Iris.error("Failed to update bukkit.yml!");
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
     }

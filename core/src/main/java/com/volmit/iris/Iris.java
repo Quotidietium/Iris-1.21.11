@@ -234,7 +234,6 @@ public class Iris extends VolmitPlugin implements Listener {
         try {
             downloadToFile(url, f);
         } catch (IOException e) {
-            e.printStackTrace();
             Iris.reportError(e);
             return null;
         }
@@ -332,7 +331,6 @@ public class Iris extends VolmitPlugin implements Listener {
                 try {
                     object.run();
                 } catch (Throwable e) {
-                    e.printStackTrace();
                     Iris.reportError(e);
                 }
             }, RNG.r.i(100, 1200));
@@ -437,7 +435,7 @@ public class Iris extends VolmitPlugin implements Listener {
             pw.close();
             Iris.info("DUMPED! See " + fi.getAbsolutePath());
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -524,11 +522,11 @@ public class Iris extends VolmitPlugin implements Listener {
                     Iris.info(C.LIGHT_PURPLE + "Loaded " + s + "!");
                 } catch (Throwable e) {
                     Iris.error("Failed to load world " + s + "!");
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             });
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
             reportError(e);
         }
     }
@@ -557,7 +555,7 @@ public class Iris extends VolmitPlugin implements Listener {
         try {
             audiences = new Bindings.Adventure(this);
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
             IrisSettings.get().getGeneral().setUseConsoleCustomColors(false);
             IrisSettings.get().getGeneral().setUseCustomColorsIngame(false);
             Iris.error("Failed to setup Adventure API... No custom colors :(");
@@ -627,7 +625,6 @@ public class Iris extends VolmitPlugin implements Listener {
                 try {
                     Iris.syncJobs.next().run();
                 } catch (Throwable e) {
-                    e.printStackTrace();
                     Iris.reportError(e);
                 }
             }

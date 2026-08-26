@@ -122,7 +122,6 @@ public class LazyPregenerator extends Thread implements Listener {
                 tick();
             } catch (Throwable e) {
                 Iris.reportError(e);
-                e.printStackTrace();
             }
         }
 
@@ -238,7 +237,7 @@ public class LazyPregenerator extends Thread implements Listener {
             try {
                 saveNow();
             } catch (Throwable e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         });
     }
@@ -291,7 +290,7 @@ public class LazyPregenerator extends Thread implements Listener {
             });
         } catch (Exception e) {
             Iris.error("Failed to shutdown Lazygen for " + world.getName());
-            e.printStackTrace();
+            Iris.reportError(e);
         } finally {
             saveNow();
             interrupt();

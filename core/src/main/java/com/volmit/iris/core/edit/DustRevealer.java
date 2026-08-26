@@ -87,7 +87,6 @@ public class DustRevealer {
                     is(new BlockPosition(block.getX() + 1, block.getY() - 1, block.getZ() + 1));
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 }
             });
         }, RNG.r.i(2, 8));

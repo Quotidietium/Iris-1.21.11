@@ -322,7 +322,6 @@ public class IrisComplex implements DataProvider {
                     return sums.computeHi(xx, zz, generators, engine);
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                     Iris.error("Failed to sample hi biome at " + xx + " " + zz + "...");
                 }
 
@@ -334,7 +333,6 @@ public class IrisComplex implements DataProvider {
                     return sums.lookupLo(xx, zz, generators, engine);
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                     Iris.error("Failed to sample lo biome at " + xx + " " + zz + "...");
                 }
 

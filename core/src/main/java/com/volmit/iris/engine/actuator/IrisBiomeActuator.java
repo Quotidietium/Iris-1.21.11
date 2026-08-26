@@ -18,6 +18,7 @@
 
 package com.volmit.iris.engine.actuator;
 
+import com.volmit.iris.Iris;
 import com.volmit.iris.core.nms.INMS;
 import com.volmit.iris.engine.framework.Engine;
 import com.volmit.iris.engine.framework.EngineAssignedActuator;
@@ -66,7 +67,7 @@ public class IrisBiomeActuator extends EngineAssignedActuator<Biome> {
             }
             getEngine().getMetrics().getBiome().put(p.getMilliseconds());
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 }

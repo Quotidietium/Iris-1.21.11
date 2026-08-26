@@ -195,7 +195,7 @@ public class IrisEngine implements Engine {
             });
         } catch (Throwable e) {
             Iris.error("FAILED TO SETUP ENGINE!");
-            e.printStackTrace();
+            Iris.reportError(e);
         }
 
         Iris.debug("Engine Setup Complete " + getCacheID());
@@ -290,7 +290,7 @@ public class IrisEngine implements Engine {
                         Iris.error("Failed to read Engine Data! Corrupted File? recreating...");
                     }
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             }
 
@@ -307,7 +307,7 @@ public class IrisEngine implements Engine {
                     try {
                         IO.writeAll(f, new Gson().toJson(data));
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        Iris.reportError(e);
                     }
                 } else {
                     Iris.error("Failed to setup Engine Data!");
@@ -526,7 +526,7 @@ public class IrisEngine implements Engine {
             Iris.debug("Saved Engine Data");
         } catch (IOException e) {
             Iris.error("Failed to save Engine Data");
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 
@@ -557,7 +557,7 @@ public class IrisEngine implements Engine {
     public void fail(String error, Throwable e) {
         failing = true;
         Iris.error(error);
-        e.printStackTrace();
+        Iris.reportError(e);
     }
 
     @Override

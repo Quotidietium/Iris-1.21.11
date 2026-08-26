@@ -175,7 +175,6 @@ public class ConversionSVC implements IrisService {
                     Iris.info("[Jigsaw]: (" + Form.pc((double) at.get() / (double) total.get(), 0) + ") Exported Piece: " + id);
                 }
             } catch (Throwable e) {
-                e.printStackTrace();
                 Iris.reportError(e);
             }
         });
@@ -184,7 +183,6 @@ public class ConversionSVC implements IrisService {
             try {
                 IO.writeAll(new File(destPools, i + ".json"), new JSONObject(new Gson().toJson(pools.get(i))).toString(4));
             } catch (IOException e) {
-                e.printStackTrace();
                 Iris.reportError(e);
             }
         }

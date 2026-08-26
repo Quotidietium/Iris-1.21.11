@@ -88,7 +88,6 @@ public class CommandLazyPregen implements DecreeExecutor {
         } catch (Throwable e) {
             sender().sendMessage(C.RED + "Epic fail. See console.");
             Iris.reportError(e);
-            e.printStackTrace();
         }
     }
 

@@ -38,7 +38,7 @@ public abstract class EngineAssignedModifier<T> extends EngineAssignedComponent 
             onModify(x, z, output, multicore, context);
         } catch (Throwable e) {
             Iris.error("Modifier Failure: " + getName());
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 }

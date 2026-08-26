@@ -86,7 +86,7 @@ public class IrisRavinePlacer implements IRare {
             int zz = z + rng.nextInt(15);
             ravine.generate(mantle, rng, base, engine, xx, y, zz, recursion, waterHint);
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
             fail.set(true);
         }
     }

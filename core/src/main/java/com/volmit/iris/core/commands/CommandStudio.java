@@ -226,7 +226,7 @@ public class CommandStudio implements DecreeExecutor {
                         mantle.getChunk(pos.getX(), pos.getZ()).copyFrom(chunk));
             } catch (Throwable e) {
                 sender().sendMessage("Error while regenerating chunks");
-                e.printStackTrace();
+                Iris.reportError(e);
             } finally {
                 DecreeContext.remove();
             }
@@ -656,7 +656,6 @@ public class CommandStudio implements DecreeExecutor {
             IO.writeAll(report, fileText.toString("\n"));
         } catch (IOException e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
 
         sender().sendMessage(C.GREEN + "Done! " + report.getPath());
@@ -835,7 +834,6 @@ public class CommandStudio implements DecreeExecutor {
 
             sender().sendMessage("Reported to: " + ff.getPath());
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
             Iris.reportError(e);
         }
     }

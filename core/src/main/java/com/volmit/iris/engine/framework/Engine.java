@@ -689,13 +689,11 @@ public interface Engine extends DataProvider, Fallible, LootProvider, BlockUpdat
                             tries.getAndIncrement();
                         } catch (Throwable ex) {
                             Iris.reportError(ex);
-                            ex.printStackTrace();
                             return;
                         }
                     }
                 } catch (Throwable e) {
                     Iris.reportError(e);
-                    e.printStackTrace();
                 }
             });
         }
@@ -756,7 +754,6 @@ public interface Engine extends DataProvider, Fallible, LootProvider, BlockUpdat
                         tries.getAndIncrement();
                     } catch (Throwable xe) {
                         Iris.reportError(xe);
-                        xe.printStackTrace();
                         return;
                     }
                 }

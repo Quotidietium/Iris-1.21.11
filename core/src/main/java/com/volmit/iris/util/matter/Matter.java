@@ -72,7 +72,7 @@ public interface Matter {
                 Iris.info("Converted " + folder.getPath() + " Saved " + (fs - folder.length()));
             } catch (Throwable e) {
                 Iris.error("Failed to convert " + folder.getPath());
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
 
@@ -160,7 +160,6 @@ public interface Matter {
                     Iris.addPanic("read.byte.range", start + " " + end);
                     Iris.addPanic("read.byte.current", din.count() + "");
                     Iris.reportError(e);
-                    e.printStackTrace();
                     Iris.panic();
                     TectonicPlate.addError();
                 }
@@ -321,7 +320,7 @@ public interface Matter {
                 try {
                     throw new RuntimeException("Bad slice " + c.getCanonicalName());
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
 
                 return null;

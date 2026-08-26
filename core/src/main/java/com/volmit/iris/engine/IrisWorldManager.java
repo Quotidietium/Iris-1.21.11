@@ -571,7 +571,7 @@ public class IrisWorldManager extends EngineAssignedWorldManager {
                         }
                     }).get();
                 } catch (InterruptedException | ExecutionException e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
 
                 if (remove.get()) {

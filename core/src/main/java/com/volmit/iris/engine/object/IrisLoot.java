@@ -135,7 +135,7 @@ public class IrisLoot {
                 return INMS.get().applyCustomNbt(is, customNbt);
             } catch (Throwable e) {
                 //Iris.reportError(e);
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
 

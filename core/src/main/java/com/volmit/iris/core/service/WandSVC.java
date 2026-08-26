@@ -165,7 +165,6 @@ public class WandSVC implements IrisService {
 
             return s;
         } catch (Throwable e) {
-            e.printStackTrace();
             Iris.reportError(e);
         }
 
@@ -187,7 +186,6 @@ public class WandSVC implements IrisService {
 
             return WorldMatter.createMatter(p.getName(), f[0], f[1]);
         } catch (Throwable e) {
-            e.printStackTrace();
             Iris.reportError(e);
         }
 
@@ -371,7 +369,7 @@ public class WandSVC implements IrisService {
                 Iris.reportError(e);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            Iris.reportError(e);
         }
     }
 

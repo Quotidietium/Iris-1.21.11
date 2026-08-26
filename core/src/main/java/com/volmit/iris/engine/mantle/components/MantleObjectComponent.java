@@ -79,7 +79,6 @@ public class MantleObjectComponent extends IrisMantleComponent {
                     Iris.error("Failed to place objects in the following biome: " + biome.getName());
                     Iris.error("Object(s) " + i.getPlace().toString(", ") + " (" + e.getClass().getSimpleName() + ").");
                     Iris.error("Are these objects missing?");
-                    e.printStackTrace();
                 }
             }
         }
@@ -93,7 +92,6 @@ public class MantleObjectComponent extends IrisMantleComponent {
                     Iris.error("Failed to place objects in the following region: " + region.getName());
                     Iris.error("Object(s) " + i.getPlace().toString(", ") + " (" + e.getClass().getSimpleName() + ").");
                     Iris.error("Are these objects missing?");
-                    e.printStackTrace();
                 }
             }
         }
@@ -191,7 +189,6 @@ public class MantleObjectComponent extends IrisMantleComponent {
                             return IrisObject.sampleSize(getData().getObjectLoader().findFile(i));
                         } catch (IOException ex) {
                             Iris.reportError(ex);
-                            ex.printStackTrace();
                         }
 
                         return null;
@@ -229,7 +226,6 @@ public class MantleObjectComponent extends IrisMantleComponent {
                                 return IrisObject.sampleSize(getData().getObjectLoader().findFile(j));
                             } catch (IOException ioException) {
                                 Iris.reportError(ioException);
-                                ioException.printStackTrace();
                             }
 
                             return null;

@@ -55,7 +55,7 @@ public class V {
         } catch (Throwable e) {
             Iris.reportError(e);
             if (!suppress) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
 
@@ -68,7 +68,7 @@ public class V {
         } catch (Throwable e) {
             Iris.reportError(e);
             if (!suppress) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
 
@@ -81,7 +81,7 @@ public class V {
         } catch (Throwable e) {
             Iris.reportError(e);
             if (!suppress) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
 
@@ -95,7 +95,7 @@ public class V {
         } catch (Throwable e) {
             Iris.reportError(e);
             if (!suppress) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
 
@@ -118,7 +118,7 @@ public class V {
         } catch (Throwable e) {
             Iris.reportError(e);
             if (!suppress) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
 
@@ -132,7 +132,7 @@ public class V {
         } catch (Throwable e) {
             Iris.reportError(e);
             if (!suppress) {
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
     }

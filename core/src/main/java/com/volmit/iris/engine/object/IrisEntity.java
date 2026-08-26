@@ -198,9 +198,8 @@ public class IrisEntity extends IrisRegistrant {
                     }
                 }).get();
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             } catch (ExecutionException e) {
-                e.printStackTrace();
             }
             at = f.get();
         }
@@ -217,7 +216,7 @@ public class IrisEntity extends IrisRegistrant {
                     ee = (Entity) gen.getExecution().spawnMob(spawnerScript, at);
                 } catch (Throwable ex) {
                     Iris.error("You must return an Entity in your scripts to use entity scripts!");
-                    ex.printStackTrace();
+                    Iris.reportError(ex);
                 }
             }
         }

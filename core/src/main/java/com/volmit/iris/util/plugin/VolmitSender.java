@@ -313,9 +313,8 @@ public class VolmitSender implements CommandSender {
             try {
                 g.set(f.get());
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Iris.reportError(e);
             } catch (ExecutionException e) {
-                e.printStackTrace();
             }
         });
 

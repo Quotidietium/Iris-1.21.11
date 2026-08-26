@@ -545,7 +545,6 @@ public class JSONArray implements Iterable<Object> {
             Iris.reportError(e);
             return defaultValue;
         } catch (NullPointerException e) {
-            Iris.reportError(e);
             return defaultValue;
         }
     }
