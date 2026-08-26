@@ -202,11 +202,14 @@ public class DataContainer<T> {
 
     private void trim() {
         int paletteSize = palette.size();
-        // Histogram of used palette ids; ids are <= palette.size().
+        // Histogram of used palette ids; ids are <= palette.size(). Runs under
+        // the write lock (writeDos) or before publication (read constructor):
+        // plain-coherent element access suffices, and the repacked array is
+        // published through the structureVersion release below.
         int[] used = new int[paletteSize + 2];
         int distinct = 0;
         for (int i = 0; i < length; i++) {
-            int x = data.get(i);
+            int x = data.getOpaque(i);
             if (x <= 0 || x > paletteSize) continue;
             if (used[x]++ == 0) distinct++;
         }
@@ -225,8 +228,8 @@ public class DataContainer<T> {
         }
         var tBits = new DataBits(bits, length);
         for (int i = 0; i < length; i++) {
-            int x = data.get(i);
-            tBits.set(i, x <= 0 || x > paletteSize ? 0 : remap[x]);
+            int x = data.getOpaque(i);
+            tBits.setOpaque(i, x <= 0 || x > paletteSize ? 0 : remap[x]);
         }
 
         structureVersion++;

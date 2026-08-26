@@ -99,8 +99,10 @@ public class DataBits {
     private static AtomicLongArray longs(DataInputStream din, int longSize) throws IOException {
         AtomicLongArray a = new AtomicLongArray(longSize);
 
+        // Fresh instance, published only via final-field freeze / the caller's
+        // happens-before edges: plain-coherent stores are enough per element.
         for (int i = 0; i < a.length(); i++) {
-            a.set(i, Varint.readUnsignedVarLong(din));
+            a.setOpaque(i, Varint.readUnsignedVarLong(din));
         }
 
         return a;
@@ -145,6 +147,28 @@ public class DataBits {
         long var2 = this.data.get(var1);
         int var4 = (var0 - var1 * valuesPerLong) * this.bits;
         return (int) (var2 >> var4 & mask);
+    }
+
+    /**
+     * Plain-coherent element access for lock-held batch passes (whole-array
+     * dumps, repacks): same values as {@link #get}, without per-element
+     * volatile ordering. Cell-level atomicity is preserved (element-wise
+     * coherence); ordering is the caller's business.
+     */
+    public int getOpaque(int var0) {
+        int var1 = cellIndex(var0);
+        long var2 = this.data.getOpaque(var1);
+        int var4 = (var0 - var1 * valuesPerLong) * this.bits;
+        return (int) (var2 >> var4 & mask);
+    }
+
+    /** Plain-coherent counterpart of {@link #set} for lock-held batch writes. */
+    public void setOpaque(int var0, int var1) {
+        int var2 = cellIndex(var0);
+        long var3 = this.data.getOpaque(var2);
+        int var5 = (var0 - var2 * this.valuesPerLong) * this.bits;
+
+        this.data.setOpaque(var2, var3 & (this.mask << var5 ^ 0xFFFFFFFFFFFFFFFFL) | (var1 & this.mask) << var5);
     }
 
     public AtomicLongArray getRaw() {
@@ -211,8 +235,10 @@ public class DataBits {
     }
 
     public void write(DataOutputStream dos) throws IOException {
+        // Whole-array dump under the container's write lock (or on an
+        // unpublished instance): plain-coherent reads suffice per long.
         for (int i = 0; i < data.length(); i++) {
-            Varint.writeUnsignedVarLong(data.get(i), dos);
+            Varint.writeUnsignedVarLong(data.getOpaque(i), dos);
         }
     }
 }

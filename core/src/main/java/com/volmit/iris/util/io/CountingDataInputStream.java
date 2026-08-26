@@ -51,7 +51,10 @@ public class CountingDataInputStream extends DataInputStream {
         }
 
         private void count(int i) {
-            count = Math.addExact(count, i);
+            // Plain add: Math.addExact's overflow check fired a branch per
+            // read call on the plate-load path; a long byte counter cannot
+            // reach 2^63 in any realistic (or physical) stream lifetime.
+            count += i;
             if (mark == -1)
                 return;
 

@@ -98,10 +98,12 @@ public class HashPalette<T> implements Palette<T> {
 
     @Override
     public Palette<T> from(Palette<T> oldPalette) {
+        // One allocation up front instead of a grow+copy per power of two —
+        // the entry count is known before the loop starts.
+        ensureCapacity(oldPalette.size());
         oldPalette.iterate((t, i) -> {
             if (t == null) throw new NullPointerException("Null palette entries are not allowed!");
             palette.put(t, i);
-            ensureCapacity(i);
             byId.set(i, t);
         });
         size.set(oldPalette.size() + 1);
@@ -110,11 +112,14 @@ public class HashPalette<T> implements Palette<T> {
 
     @Override
     public Palette<T> from(int size, Writable<T> writable, DataInputStream in) throws IOException {
+        // Same presize: deserialize targets know their entry count, so the
+        // incremental grow-copy chain (16 -> 32 -> ... -> size) collapses to
+        // a single array allocation.
+        ensureCapacity(size);
         for (int i = 1; i <= size; i++) {
             T t = writable.readNodeData(in);
             if (t == null) throw new NullPointerException("Null palette entries are not allowed!");
             palette.put(t, i);
-            ensureCapacity(i);
             byId.set(i, t);
         }
         this.size.set(size + 1);
