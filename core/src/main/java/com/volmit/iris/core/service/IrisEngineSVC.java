@@ -190,6 +190,7 @@ public class IrisEngineSVC implements IrisService {
         private final int offset = RNG.r.nextInt(TRIM_PERIOD);
         private transient ScheduledFuture<?> trimmer;
         private transient ScheduledFuture<?> unloader;
+        private transient int pressureTicks;
         private transient boolean closed;
 
         private Registered(String name, PlatformChunkGenerator access) {
@@ -234,6 +235,25 @@ public class IrisEngineSVC implements IrisService {
                         return;
 
                     try {
+                        // Sustained-heap-pressure backstop: two consecutive
+                        // ticks above the configured fraction of max heap
+                        // (raw used/max, so garbage inflates it — hence the
+                        // two-tick filter) drive the hard cap down to a
+                        // minimal resident set. Pinned plates (in-flight
+                        // generation) stay; everything idle is forced out
+                        // and reloads from disk on next touch.
+                        int pct = IrisSettings.get().getPerformance().getMantleMemoryBackstopPercent();
+                        if (pct > 0) {
+                            Runtime rt = Runtime.getRuntime();
+                            double used = (double) (rt.totalMemory() - rt.freeMemory()) / rt.maxMemory();
+                            pressureTicks = used * 100d > pct ? pressureTicks + 1 : 0;
+                            if (pressureTicks >= 2) {
+                                engine.getMantle().trim(1);
+                            }
+                        } else {
+                            pressureTicks = 0;
+                        }
+
                         long unloadStart = System.currentTimeMillis();
                         int count = engine.getMantle().unloadTectonicPlate(IrisSettings.get().getPerformance().getEngineSVC().forceMulticoreWrite ? 0 : tectonicLimit());
                         if (count > 0) {

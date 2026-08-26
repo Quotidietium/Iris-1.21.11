@@ -171,6 +171,14 @@ public class IrisSettings {
         public int scriptLoaderCacheSize = 512;
         public int tectonicPlateSize = -1;
         public int mantleCleanupDelay = 200;
+        /**
+         * Sustained-heap-pressure backstop threshold, in percent of max heap.
+         * When used memory stays above this level for two consecutive unload
+         * ticks, the mantle hard cap is driven down to a minimal resident set
+         * (in-flight pinned plates stay loaded). 0 disables the backstop.
+         * Default 45 keeps residency comfortably below half of the heap.
+         */
+        public int mantleMemoryBackstopPercent = 45;
 
         public int getTectonicPlateSize() {
             if (tectonicPlateSize > 0)

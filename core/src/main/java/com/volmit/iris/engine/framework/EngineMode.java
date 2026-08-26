@@ -71,9 +71,18 @@ public interface EngineMode extends Staged {
     default void generate(int x, int z, Hunk<BlockData> blocks, Hunk<Biome> biomes, boolean multicore) {
         ChunkContext ctx = new ChunkContext(x, z, getComplex());
         IrisContext.getOr(getEngine()).setChunkContext(ctx);
-
-        for (EngineStage i : getStages()) {
-            i.generate(x, z, blocks, biomes, multicore, ctx);
+        try {
+            for (EngineStage i : getStages()) {
+                i.generate(x, z, blocks, biomes, multicore, ctx);
+            }
+        } finally {
+            // Drop the per-chunk snapshot once the chunk is done: pool threads
+            // outlive the chunk, and a stale context pins its prefilled arrays
+            // (and through them the engine graph) on every idle worker thread.
+            // Streams sampled outside a chunk see a null context and fall
+            // through to their source (ContextInjectingStream contract), same
+            // as a thread that never generated a chunk.
+            IrisContext.get().setChunkContext(null);
         }
     }
 }

@@ -76,6 +76,13 @@ public class Mantle {
     private final IOWorker worker;
     private final AtomicDouble adjustedIdleDuration;
     private final KSet<Long> toUnload;
+    private final KSet<Long> forcedUnload;
+
+    /**
+     * Escape hatch (and A/B switch) for hard-cap plate eviction: set
+     * -Diris.mantle.hardcap=false to restore idle-only unloading.
+     */
+    private static final boolean HARD_CAP = !"false".equals(System.getProperty("iris.mantle.hardcap", "true"));
 
     /**
      * Create a new mantle
@@ -96,6 +103,7 @@ public class Mantle {
         ioBurst = MultiBurst.ioBurst;
         adjustedIdleDuration = new AtomicDouble(0);
         toUnload = new KSet<>();
+        forcedUnload = new KSet<>();
         worker = new IOWorker(dataFolder, worldHeight);
         Iris.debug("Opened The Mantle " + C.DARK_AQUA + dataFolder.getAbsolutePath());
     }
@@ -505,6 +513,39 @@ public class Mantle {
                     }
                 });
             }
+
+            // Hard cap. Idle-based eviction lags fast generation: every touch
+            // refreshes lastUse, so a hot pregen sweep keeps hundreds of
+            // plates "young" at once and none ever idle out. When the loaded
+            // set exceeds the limit, force the OLDEST plates beyond the limit
+            // into the unload queue regardless of idle age — the unloader
+            // still refuses plates with in-flight pins (inUse), so active
+            // generation keeps its working set. Reload on next touch restores
+            // identical data from disk; only residency changes.
+            if (HARD_CAP && tectonicLimit >= 0 && lastUse.size() > tectonicLimit) {
+                int n = lastUse.size();
+                long[] keys = new long[n];
+                long[] times = new long[n];
+                int idx = 0;
+                for (var e : lastUse.entrySet()) {
+                    keys[idx] = e.getKey();
+                    times[idx] = e.getValue();
+                    idx++;
+                }
+                Integer[] order = new Integer[n];
+                for (int i = 0; i < n; i++) order[i] = i;
+                java.util.Arrays.sort(order, java.util.Comparator.comparingLong((Integer i) -> times[i]));
+                int excess = n - tectonicLimit;
+                for (int k = 0; k < excess; k++) {
+                    long id = keys[order[k]];
+                    hyperLock.withLong(id, () -> {
+                        if (loadedRegions.containsKey(id)) {
+                            forcedUnload.add(id);
+                            toUnload.add(id);
+                        }
+                    });
+                }
+            }
         } catch (Throwable e) {
             Iris.reportError(e);
         } finally {
@@ -530,11 +571,16 @@ public class Mantle {
                     if (m == null) {
                         Iris.debug("Tectonic Plate was added to unload while not loaded " + C.DARK_GREEN + Cache.keyX(id) + " " + Cache.keyZ(id));
                         toUnload.remove(id);
+                        forcedUnload.remove(id);
                         return;
                     }
 
                     var used = lastUse.getOrDefault(id, 0L);
-                    if (!toUnload.contains(id) || used >= unloadTime) {
+                    // Forced entries (hard-cap overage) bypass the idle check —
+                    // they were selected precisely because idle eviction could
+                    // not keep up; the inUse() check below still protects
+                    // anything with an in-flight pin.
+                    if (!forcedUnload.contains(id) && (!toUnload.contains(id) || used >= unloadTime)) {
                         return;
                     }
 
@@ -551,6 +597,7 @@ public class Mantle {
                         loadedRegions.remove(id, m);
                         lastUse.remove(id);
                         toUnload.remove(id);
+                        forcedUnload.remove(id);
                         i.incrementAndGet();
                         Iris.debug("Unloaded Tectonic Plate " + C.DARK_GREEN + Cache.keyX(id) + " " + Cache.keyZ(id));
                     } catch (IOException | InterruptedException e) {
@@ -725,6 +772,7 @@ public class Mantle {
     private void use(Long key) {
         lastUse.put(key, M.ms());
         toUnload.remove(key);
+        forcedUnload.remove(key);
     }
 
     public void saveAll() {
