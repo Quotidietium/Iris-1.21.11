@@ -32,6 +32,7 @@
 | [round27-burst-exception-propagation.md](round27-burst-exception-propagation.md) | **稳定性基建轮**：BurstExecutor.complete 吞异常修复——join-all 屏障（R12 契约）+ 首失败解包重抛 + futures 恒清理（幂等重试）+ 逐 future 捕 Throwable（**JDK 陷阱：ForkJoinTask.get() 直接重抛反射重建的未检查异常、不包 ExecutionException 且丢身份**）；29 处调用方审计全分类安全（多核失败首次与单核同等可见：红陶标记路径）；`bench.VerifyBurstException`；golden 49/49，B/op 全 1.000× |
 | [round28-trim-zero-limit-semantics.md](round28-trim-zero-limit-semantics.md) | **语义修正轮**：Mantle.trim 除零怪语义——limit=0 时 (loaded-0)/0.0=Infinity（loaded=0 时 NaN）被 Math.max 顶到 4000ms floor，`trim(0,0)` 的 flush-now 意图静默变 flush-after-4s（IrisPregenerator 停止路径 + R26 settle 曾被迫 sleep 4.5s 规避）；limit<=0 现显式跳过超限修正，VerifyMemoryBound 去 sleep 双臂立即清零；golden 49/49 |
 | [round29-production-stub-object-place.md](round29-production-stub-object-place.md) | **测量修正+分配清扫轮**：BenchBlockData 字段读桩替代 JDK 动态代理（R25 的 40% 剖析伪影；**测量重定基：object-place 时间 2.01×/B/op -71%、matter-roundtrip B/op -34% 为历史读数修正系数**）；真实成本结构下两个每方块分配源消除——空 edit 列表 Itr + listener BlockPosition（ObjectPlaceListener int 化，MantleObjectComponent/PlannedStructure 两生产 listener 均立即拆箱）；object-place B/op **-60.3%**、stilt **-57.6%**（同桩 A/B）；golden 49/49 |
+| [round30-vectormap-cursor-rejected.md](round30-vectormap-cursor-rejected.md) | **负结果轮**：CursorIterator 的 CHM Entry 装箱原生化（keySet+get）——遍历序 digest 一致但同窗口 A/B **object-place 9/9 更慢（+3.9%）且 B/op 中性**（装箱已被 EA 标量消除，JFR 采样高估；每条目 get 探查比装箱贵）当场回退；**教训第四账：JFR 分配采样≠热循环真实分配，方向决策以纯净 B/op A/B 为准** |
 
 - 原始数据:`benchmark/results/round*.csv`(每场景 5 次测量)
 - 金样本:`benchmark/golden/golden.csv`(**49 场景**固定种子摘要,行为一致性的判定基准)
