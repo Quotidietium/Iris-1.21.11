@@ -303,9 +303,15 @@ public class IrisObject extends IrisRegistrant {
         this.d = din.readInt();
         center = new Vector3i(w / 2, h / 2, d / 2);
         int s = din.readInt();
+        // Legacy format carries a UTF string per block (no palette), so only
+        // the cursor-vector reuse applies here.
+        Vector3i cursor = new Vector3i(0, 0, 0);
 
         for (int i = 0; i < s; i++) {
-            blocks.put(new Vector3i(din.readShort(), din.readShort(), din.readShort()), B.get(din.readUTF()));
+            cursor.setX(din.readShort());
+            cursor.setY(din.readShort());
+            cursor.setZ(din.readShort());
+            blocks.put(cursor, B.get(din.readUTF()));
         }
 
         if (din.available() == 0)
@@ -315,7 +321,10 @@ public class IrisObject extends IrisRegistrant {
             int size = din.readInt();
 
             for (int i = 0; i < size; i++) {
-                states.put(new Vector3i(din.readShort(), din.readShort(), din.readShort()), TileData.read(din));
+                cursor.setX(din.readShort());
+                cursor.setY(din.readShort());
+                cursor.setZ(din.readShort());
+                states.put(cursor, TileData.read(din));
             }
         } catch (Throwable e) {
             Iris.reportError(e);
@@ -339,16 +348,33 @@ public class IrisObject extends IrisRegistrant {
             palette.add(din.readUTF());
         }
 
+        // Resolve the palette once: per block this replaces a B.get string
+        // lookup (contains/startsWith + cache probe) with an array load, and
+        // the reusable cursor vector replaces a fresh Vector3i per block —
+        // VectorMap.put only reads coordinates and never retains the passed
+        // vector, so one mutable instance serves the whole load.
+        BlockData[] resolved = new BlockData[palette.size()];
+        for (i = 0; i < resolved.length; i++) {
+            resolved[i] = B.get(palette.get(i));
+        }
+        Vector3i cursor = new Vector3i(0, 0, 0);
+
         s = din.readInt();
 
         for (i = 0; i < s; i++) {
-            blocks.put(new Vector3i(din.readShort(), din.readShort(), din.readShort()), B.get(palette.get(din.readShort())));
+            cursor.setX(din.readShort());
+            cursor.setY(din.readShort());
+            cursor.setZ(din.readShort());
+            blocks.put(cursor, resolved[din.readShort()]);
         }
 
         s = din.readInt();
 
         for (i = 0; i < s; i++) {
-            states.put(new Vector3i(din.readShort(), din.readShort(), din.readShort()), TileData.read(din));
+            cursor.setX(din.readShort());
+            cursor.setY(din.readShort());
+            cursor.setZ(din.readShort());
+            states.put(cursor, TileData.read(din));
         }
     }
 
