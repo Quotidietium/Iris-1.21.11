@@ -14,6 +14,7 @@
 | `src/bench/Benchmark.java` | 43 个场景：CNG 噪声 2D/3D/断裂链/Perlin、fit 选择、IRare 生物群系挑选（现代/legacy）、implode 稀有度（重建/缓存）、2D 插值×3、3D 插值×2、WorldCache2D（全 miss/命中）、逐列 RNG、地形列填充（legacy/新路径，真实 IrisBiome/Region/Dimension）、并行×3（8 线程共享 CNG/共享缓存散点/raster）、Matter/Mantle 存储层×4（DataContainer set/get、MantleChunk 写链、16³ Matter 序列化往返）、HyperLock×2（单线程命中、8 线程同键争用）、对象放置×2（IrisObject.place 主循环/STILT 循环，真实 IrisObject+IrisObjectPlacement+记录型 placer）、装饰器×2、沉积、洞穴雕刻×2、后处理、群系高度、铺层、**区块上下文预填充×2（新行任务路径 vs 旧协程编排复刻 `OldContextFill`——真实 kotlinx-coroutines）**、标志位提升、TectonicPlate 写读盘往返 |
 | `src/bench/Verify3D.java` | 3D 适配器 vs 原 lambda 链的 60 万采样 A/B 等价性证明 |
 | `src/bench/VerifyMemoryBound.java` | R26 内存有界性证明：真实 Mantle+MantleWriter 的持续热预生成扫掠 + EngineSVC 节奏 trim/unload 驱动；断言硬上限（loaded≤limit+2）、settle 零钉住（引用泄漏端到端审计）、堆平台（无 ratchet）。`-Diris.mantle.hardcap=false` 臂复现 R26 前的线性驻留增长。用法：`java -cp <同run.sh> bench.VerifyMemoryBound [limit] [sweepWidthChunks] [sweepDepthChunks]` |
+| `src/bench/VerifyBurstException.java` | R27 BurstExecutor.complete 异常语义回归证明：屏障 join-all、首失败传播（类+cause 链——FJP 反射重建丢身份）、幂等重试、单核内联身份保留。用法：`java -cp <同run.sh> bench.VerifyBurstException` |
 | `results/` | 各轮原始 CSV（提交进库） |
 | `golden/` | 金样本摘要快照（it=0 digest） |
 
