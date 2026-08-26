@@ -61,6 +61,12 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
         PrecisionStopwatch p = PrecisionStopwatch.start();
         Mantle mantle = getEngine().getMantle().getMantle();
         MantleChunk mc = mantle.getChunk(x, z).use();
+        // The use() pin must survive any failure in the ~150 lines below
+        // (stream/hotload races included): a chunk whose pin leaks stays
+        // inUse() forever, pinning its whole TectonicPlate against unload
+        // for the life of the engine. Body left at its original indent to
+        // keep this safety fix a two-line diff.
+        try {
         KMap<IrisPosition, MatterCavern> walls = new KMap<>();
         // Per-column cave Ys accumulate into a fixed 256-slot array (rx*16+rz),
         // avoiding a boxed-Long KMap lookup per block. firstTouch records the
@@ -210,7 +216,9 @@ public class IrisCarveModifier extends EngineAssignedModifier<BlockData> {
         });
 
         getEngine().getMetrics().getDeposit().put(p.getMilliseconds());
-        mc.release();
+        } finally {
+            mc.release();
+        }
     }
 
     /** Per-onModify memo for the neighbor cavern probes (see onModify). */

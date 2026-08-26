@@ -75,26 +75,40 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
         // every chunk in a boxed temporary KMap and copy it over afterwards -
         // one Long box plus one CHM node per chunk, all garbage - while the
         // long-keyed map sitting in cachedChunks takes the same put unboxed.
-        if (multicore) {
-            @SuppressWarnings("unchecked") final KMap<Long, MantleChunk> map = (KMap<Long, MantleChunk>) cachedChunks;
-            mantle.getChunks(
-                    x - radius,
-                    x + radius,
-                    z - radius,
-                    z + radius,
-                    parallelism,
-                    (i, j, c) -> map.put(Cache.key(i, j), c.use())
-            );
-        } else {
-            final Long2ObjectOpenHashMap<MantleChunk> map = (Long2ObjectOpenHashMap<MantleChunk>) cachedChunks;
-            mantle.getChunks(
-                    x - radius,
-                    x + radius,
-                    z - radius,
-                    z + radius,
-                    parallelism,
-                    (i, j, c) -> map.put(Cache.key(i, j), c.use())
-            );
+        // getChunks' consumer can throw (chunk.use() throws IllegalStateException
+        // when its plate is being closed under us, e.g. a hotload racing this
+        // generation); chunks pinned before the failure must be released here
+        // because the caller's try-with-resources never sees a constructed
+        // writer and would otherwise leak the pins - and a pinned chunk keeps
+        // its whole TectonicPlate loaded forever.
+        try {
+            if (multicore) {
+                @SuppressWarnings("unchecked") final KMap<Long, MantleChunk> map = (KMap<Long, MantleChunk>) cachedChunks;
+                mantle.getChunks(
+                        x - radius,
+                        x + radius,
+                        z - radius,
+                        z + radius,
+                        parallelism,
+                        (i, j, c) -> map.put(Cache.key(i, j), c.use())
+                );
+            } else {
+                final Long2ObjectOpenHashMap<MantleChunk> map = (Long2ObjectOpenHashMap<MantleChunk>) cachedChunks;
+                mantle.getChunks(
+                        x - radius,
+                        x + radius,
+                        z - radius,
+                        z + radius,
+                        parallelism,
+                        (i, j, c) -> map.put(Cache.key(i, j), c.use())
+                );
+            }
+        } catch (Throwable e) {
+            for (MantleChunk c : cachedChunks.values()) {
+                c.release();
+            }
+            cachedChunks.clear();
+            throw e;
         }
     }
 

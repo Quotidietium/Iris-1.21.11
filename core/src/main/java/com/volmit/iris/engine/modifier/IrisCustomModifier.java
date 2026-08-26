@@ -17,27 +17,32 @@ public class IrisCustomModifier extends EngineAssignedModifier<BlockData> {
     public void onModify(int x, int z, Hunk<BlockData> output, boolean multicore, ChunkContext context) {
         var mc = getEngine().getMantle().getMantle().getChunk(x >> 4, z >> 4);
         if (!mc.isFlagged(MantleFlag.CUSTOM_ACTIVE)) return;
+        // The use() pin must survive any failure below: a chunk whose pin
+        // leaks stays inUse() forever, which pins its whole TectonicPlate
+        // against unloading for the life of the engine.
         mc.use();
+        try {
+            BurstExecutor burst = MultiBurst.burst.burst(output.getHeight());
+            burst.setMulticore(multicore);
+            for (int y = 0; y < output.getHeight(); y++) {
+                int finalY = y;
+                burst.queue(() -> {
+                    for (int rX = 0; rX < output.getWidth(); rX++) {
+                        for (int rZ = 0; rZ < output.getDepth(); rZ++) {
+                            BlockData b = output.get(rX, finalY, rZ);
+                            if (!(b instanceof IrisCustomData d)) continue;
 
-        BurstExecutor burst = MultiBurst.burst.burst(output.getHeight());
-        burst.setMulticore(multicore);
-        for (int y = 0; y < output.getHeight(); y++) {
-            int finalY = y;
-            burst.queue(() -> {
-                for (int rX = 0; rX < output.getWidth(); rX++) {
-                    for (int rZ = 0; rZ < output.getDepth(); rZ++) {
-                        BlockData b = output.get(rX, finalY, rZ);
-                        if (!(b instanceof IrisCustomData d)) continue;
-
-                        mc.getOrCreate(finalY >> 4)
-                                .slice(Identifier.class)
-                                .set(rX, finalY & 15, rZ, d.getCustom());
-                        output.set(rX, finalY, rZ, d.getBase());
+                            mc.getOrCreate(finalY >> 4)
+                                    .slice(Identifier.class)
+                                    .set(rX, finalY & 15, rZ, d.getCustom());
+                            output.set(rX, finalY, rZ, d.getBase());
+                        }
                     }
-                }
-            });
+                });
+            }
+            burst.complete();
+        } finally {
+            mc.release();
         }
-        burst.complete();
-        mc.release();
     }
 }
