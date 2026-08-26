@@ -55,6 +55,14 @@ public class DataContainer<T> {
     private final int length;
     private final Writable<T> writer;
 
+    /**
+     * Set on any mutation (set()), cleared by trim(). writeDos skips the
+     * O(length) trim scan when clean: the used-id histogram can only change
+     * through set(), so an unmodified container serializes its already-trimmed
+     * representation byte-identically. Guarded by the write lock.
+     */
+    private boolean dirty;
+
     public DataContainer(Writable<T> writer, int length) {
         this.write = new ReentrantReadWriteLock().writeLock();
 
@@ -116,7 +124,9 @@ public class DataContainer<T> {
     public void writeDos(DataOutputStream dos) throws IOException {
         write.lock();
         try {
-            trim();
+            if (dirty) {
+                trim();
+            }
             Varint.writeUnsignedVarInt(length, dos);
             Varint.writeUnsignedVarInt(palette.size(), dos);
             palette.iterateIO((data, __) -> writer.writeNodeData(dos, data));
@@ -147,6 +157,7 @@ public class DataContainer<T> {
 
         write.lock();
         try {
+            dirty = true;
             id = palette.id(t);
             if (id == -1) {
                 id = palette.add(t);
@@ -213,8 +224,10 @@ public class DataContainer<T> {
             if (x <= 0 || x > paletteSize) continue;
             if (used[x]++ == 0) distinct++;
         }
-        if (distinct == paletteSize)
+        if (distinct == paletteSize) {
+            dirty = false;
             return;
+        }
 
         int bits = bits(distinct + 1);
         var trimmed = newPalette(bits);
@@ -238,6 +251,7 @@ public class DataContainer<T> {
             palette = trimmed;
         } finally {
             structureVersion++;
+            dirty = false;
         }
     }
 }

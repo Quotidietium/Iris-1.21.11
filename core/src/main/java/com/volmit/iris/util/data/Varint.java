@@ -65,11 +65,23 @@ public final class Varint {
      * @throws IOException if {@link DataOutput} throws {@link IOException}
      */
     public static void writeUnsignedVarLong(long value, DataOutput out) throws IOException {
+        // Single-byte fast path first: palette ids and small counts dominate
+        // matter serialization traffic (empty cells are id 0), and the
+        // per-byte writeByte virtual call chain was over half of plate-write
+        // execution. Multi-byte values go through a scratch buffer with one
+        // array write. The encoded bytes are identical to the shift loop.
+        if ((value & 0xFFFFFFFFFFFFFF80L) == 0L) {
+            out.writeByte((int) value);
+            return;
+        }
+        byte[] buf = new byte[10];
+        int i = 0;
         while ((value & 0xFFFFFFFFFFFFFF80L) != 0L) {
-            out.writeByte(((int) value & 0x7F) | 0x80);
+            buf[i++] = (byte) (((int) value & 0x7F) | 0x80);
             value >>>= 7;
         }
-        out.writeByte((int) value & 0x7F);
+        buf[i] = (byte) ((int) value & 0x7F);
+        out.write(buf, 0, i + 1);
     }
 
     /**
@@ -84,11 +96,18 @@ public final class Varint {
      * @see #writeUnsignedVarLong(long, DataOutput)
      */
     public static void writeUnsignedVarInt(int value, DataOutput out) throws IOException {
-        while ((value & 0xFFFFFF80) != 0L) {
-            out.writeByte((value & 0x7F) | 0x80);
+        if ((value & 0xFFFFFF80) == 0) {
+            out.writeByte(value);
+            return;
+        }
+        byte[] buf = new byte[5];
+        int i = 0;
+        while ((value & 0xFFFFFF80) != 0) {
+            buf[i++] = (byte) ((value & 0x7F) | 0x80);
             value >>>= 7;
         }
-        out.writeByte(value & 0x7F);
+        buf[i] = (byte) (value & 0x7F);
+        out.write(buf, 0, i + 1);
     }
 
     public static byte[] writeSignedVarInt(int value) {
