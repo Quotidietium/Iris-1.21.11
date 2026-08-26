@@ -58,6 +58,12 @@ public class HMCLeavesDataProvider extends ExternalDataProvider {
 	@NotNull
 	@Override
 	public BlockData getBlockData(@NotNull Identifier blockId, @NotNull KMap<String, String> state) throws MissingResourceException {
+		// init() catches its own failure so a half-initialized plugin doesn't
+		// kill the class, but any reflective handle it failed to bind must
+		// surface as a MissingResourceException, not an NPE on a null handle.
+		if (worldBlockType == null) {
+			throw new MissingResourceException("HMCLeaves link not initialized!", blockId.namespace(), blockId.key());
+		}
 		Object o = blockDataMap.get(blockId.key());
 		if (o == null)
 			throw new MissingResourceException("Failed to find BlockData!", blockId.namespace(), blockId.key());
@@ -80,6 +86,10 @@ public class HMCLeavesDataProvider extends ExternalDataProvider {
 
 	@Override
 	public void processUpdate(@NotNull Engine engine, @NotNull Block block, @NotNull Identifier blockId) {
+		if (setCustomBlock == null || apiInstance == null) {
+			Iris.warn("HMCLeaves link not initialized; skipping block update for " + blockId.key());
+			return;
+		}
 		var pair = ExternalDataSVC.parseState(blockId);
 		blockId = pair.getA();
 		Boolean result = setCustomBlock.invoke(apiInstance, new Object[]{block.getLocation(), blockId.key(), false});

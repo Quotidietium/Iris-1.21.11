@@ -1,5 +1,7 @@
 package com.volmit.iris.core.link.data;
 
+import com.volmit.iris.Iris;
+
 import com.volmit.iris.core.link.ExternalDataProvider;
 import com.volmit.iris.core.link.Identifier;
 import com.volmit.iris.core.nms.container.BlockProperty;
@@ -110,20 +112,30 @@ public class CraftEngineDataProvider extends ExternalDataProvider {
         CraftEngineFurniture.place(location, furniture, variant, false);
     }
 
-    private static Location parseYawAndPitch(@NotNull Engine engine, @NotNull Block block, @NotNull Map<String, String> state) {
+    private Location parseYawAndPitch(@NotNull Engine engine, @NotNull Block block, @NotNull Map<String, String> state) {
         Location location = block.getLocation();
         long seed = engine.getSeedManager().getSeed() + Cache.key(block.getX(), block.getZ()) + block.getY();
         RNG rng = new RNG(seed);
         if ("true".equals(state.get("randomYaw"))) {
             location.setYaw(rng.f(0, 360));
         } else if (state.containsKey("yaw")) {
-            location.setYaw(Float.parseFloat(state.get("yaw")));
+            // Same malformed-state tolerance as ExternalDataProvider.parseYawAndFace:
+            // a pack writing yaw=abc must not abort the furniture placement.
+            try {
+                location.setYaw(Float.parseFloat(state.get("yaw")));
+            } catch (NumberFormatException e) {
+                Iris.warn("Invalid yaw state '" + state.get("yaw") + "' for " + block.getLocation() + "; defaulting to 0");
+            }
         }
 
         if ("true".equals(state.get("randomPitch"))) {
             location.setPitch(rng.f(0, 360));
         } else if (state.containsKey("pitch")) {
-            location.setPitch(Float.parseFloat(state.get("pitch")));
+            try {
+                location.setPitch(Float.parseFloat(state.get("pitch")));
+            } catch (NumberFormatException e) {
+                Iris.warn("Invalid pitch state '" + state.get("pitch") + "' for " + block.getLocation() + "; defaulting to 0");
+            }
         }
 
         return location;

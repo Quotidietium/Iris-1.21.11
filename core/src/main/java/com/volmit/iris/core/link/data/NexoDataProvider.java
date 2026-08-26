@@ -1,5 +1,7 @@
 package com.volmit.iris.core.link.data;
 
+import com.volmit.iris.Iris;
+
 import com.nexomc.nexo.api.NexoBlocks;
 import com.nexomc.nexo.api.NexoFurniture;
 import com.nexomc.nexo.api.NexoItems;
@@ -76,7 +78,7 @@ public class NexoDataProvider extends ExternalDataProvider {
         try {
             return builder.build();
         } catch (Exception e) {
-            e.printStackTrace();
+            Iris.reportError(e);
             throw new MissingResourceException("Failed to find ItemData!", itemId.namespace(), itemId.key());
         }
     }

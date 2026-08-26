@@ -156,7 +156,19 @@ public class ExternalDataSVC implements IrisService {
             Iris.warn("No matching Provider found for modded material \"%s\"!", blockId);
             return;
         }
-        provider.get().processUpdate(engine, block, blockId);
+        // Same containment as spawnMob below: this runs on the chunk-activation
+        // path, and a third-party plugin throwing out of its place() call must
+        // not take the chunk update batch down with it.
+        try {
+            provider.get().processUpdate(engine, block, blockId);
+        } catch (MissingResourceException e) {
+            Iris.error(e.getMessage() + " - [" + e.getClassName() + ":" + e.getKey() + "]");
+        } catch (Throwable e) {
+            Iris.reportError(e);
+            Iris.error("Provider %s failed to update block %s at %s %s %s: %s"
+                    .formatted(provider.get().getPluginId(), blockId,
+                            block.getX(), block.getY(), block.getZ(), e.getMessage()));
+        }
     }
 
     public Entity spawnMob(Location location, Identifier mobId) {
