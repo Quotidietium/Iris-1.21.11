@@ -15,7 +15,13 @@ find benchmark/src benchmark/stubs -name "*.java" | sed 's/\r$//' > benchmark/cl
 # and third-party plugin integrations whose compileOnly deps are unavailable offline.
 find core/src/main/java -name "*.java" \
   ! -path "*com/volmit/iris/Iris.java" \
-  ! -path "*com/volmit/iris/core/link/data/*DataProvider.java" \
+  ! -path "*com/volmit/iris/core/link/data/EcoItemsDataProvider.java" \
+  ! -path "*com/volmit/iris/core/link/data/ExecutableItemsDataProvider.java" \
+  ! -path "*com/volmit/iris/core/link/data/ItemAdderDataProvider.java" \
+  ! -path "*com/volmit/iris/core/link/data/KGeneratorsDataProvider.java" \
+  ! -path "*com/volmit/iris/core/link/data/MMOItemsDataProvider.java" \
+  ! -path "*com/volmit/iris/core/link/data/MythicCrucibleDataProvider.java" \
+  ! -path "*com/volmit/iris/core/link/data/MythicMobsDataProvider.java" \
   ! -path "*com/volmit/iris/core/link/IrisPapiExpansion.java" \
   ! -path "*com/volmit/iris/core/link/MultiverseCoreLink.java" \
   ! -path "*com/volmit/iris/util/misc/SlimJar.java" \

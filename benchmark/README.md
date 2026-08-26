@@ -47,6 +47,9 @@
   连续多次"莫名"截断且一次比一次早）。跑基准前确认 java 进程数为 0
   （`Get-Process java` / 循环 `Stop-Process -Name java -Force` 直到归零）。R29 那次
   "written 已打印但缺 plate-io 行"的异常与此族群相关，复跑即正常，成因未再复现。
+- **慢速期的门禁配方（R14 记录）**：主机进入 ~1.6× 慢速期时全量 3+3 超外部工具时限——
+  门禁可降为 `run.sh <csv> 1 1`（verify 只比对 it=0 的固定种子 digest，与 warmup 完全
+  无关；计时数据不要从 1+1 的 run 取）。性能 A/B 声明仍需完整预热。
 
 ## 离线依赖
 
