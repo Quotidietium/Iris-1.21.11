@@ -98,17 +98,17 @@ public class VerifyMemoryBound {
         System.out.printf("sweep done: checkpoints=%d maxLoaded=%d (limit=%d, hardcap=%s)%n",
                 checkpoints, maxLoaded, limit, hardcap);
 
-        // B: settle — everything must be unloadable (pin audit). The 4s idle
-        // floor inside trim (over-limit correction bottoms out at 4000ms) means
-        // the audit must wait past it; after that, trim(0)+unload must drain
-        // every plate — any survivor is either a leaked MantleChunk use() pin
-        // (carve/custom modifier, writer constructor failure) or an unload
-        // failure, both of which pin residency forever.
-        Thread.sleep(4500);
-        mantle.trim(0, Math.max(1, limit));
-        mantle.unloadTectonicPlate(limit);
-        mantle.trim(0, Math.max(1, limit));
-        mantle.unloadTectonicPlate(limit);
+        // B: settle — everything must be unloadable (pin audit). Since R28 an
+        // explicit zero limit means "no residency": trim(0,0) unloads every
+        // idle plate immediately (the old div-by-zero floored the idle
+        // duration at 4s, which is why this settle used to sleep 4.5s first).
+        // Any survivor is either a leaked MantleChunk use() pin (carve/custom
+        // modifier, writer constructor failure) or an unload failure, both of
+        // which pin residency forever.
+        mantle.trim(0, 0);
+        mantle.unloadTectonicPlate(0);
+        mantle.trim(0, 0);
+        mantle.unloadTectonicPlate(0);
         int settled = mantle.getLoadedRegionCount();
         if (settled != 0) {
             System.out.printf("DIAG: settled=%d toUnloadQueue=%d unloadQueued=%d%n",
