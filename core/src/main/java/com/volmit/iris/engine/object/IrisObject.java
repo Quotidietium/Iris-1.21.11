@@ -364,10 +364,32 @@ public class IrisObject extends IrisRegistrant {
             palette.addIfMissing(i.getAsString());
         }
 
+        writePaletteAndBlocks(dos, palette);
+        writeStates(dos);
+    }
+
+    /**
+     * Shared tail of both write variants. The palette index map replaces an
+     * O(blocks x palette) indexOf scan per block; the emitted bytes are
+     * identical (same palette build order, same lookup results).
+     */
+    private void writePaletteAndBlocks(DataOutputStream dos, KList<String> palette) throws IOException {
+        // writeShort caps the palette at 65535 entries; writing more would
+        // silently truncate the count and corrupt the whole file for the
+        // reader. Fail loudly instead.
+        if (palette.size() > 65535) {
+            throw new IOException("Object palette too large to serialize: " + palette.size() + " entries (max 65535)");
+        }
+
         dos.writeShort(palette.size());
 
         for (String i : palette) {
             dos.writeUTF(i);
+        }
+
+        var index = new java.util.HashMap<String, Integer>(palette.size() * 2);
+        for (int i = 0; i < palette.size(); i++) {
+            index.put(palette.get(i), i);
         }
 
         dos.writeInt(blocks.size());
@@ -377,9 +399,11 @@ public class IrisObject extends IrisRegistrant {
             dos.writeShort(i.getBlockX());
             dos.writeShort(i.getBlockY());
             dos.writeShort(i.getBlockZ());
-            dos.writeShort(palette.indexOf(entry.getValue().getAsString()));
+            dos.writeShort(index.get(entry.getValue().getAsString()));
         }
+    }
 
+    private void writeStates(DataOutputStream dos) throws IOException {
         dos.writeInt(states.size());
         for (var entry : states) {
             var i = entry.getKey();
@@ -419,24 +443,7 @@ public class IrisObject extends IrisRegistrant {
                     }
                     total -= blocks.size() - palette.size();
 
-                    dos.writeShort(palette.size());
-
-                    for (String i : palette) {
-                        dos.writeUTF(i);
-                        ++c;
-                    }
-
-                    dos.writeInt(blocks.size());
-
-                    for (var entry : blocks) {
-                        var i = entry.getKey();
-                        dos.writeShort(i.getBlockX());
-                        dos.writeShort(i.getBlockY());
-                        dos.writeShort(i.getBlockZ());
-                        dos.writeShort(palette.indexOf(entry.getValue().getAsString()));
-                        ++c;
-                    }
-
+                    writePaletteAndBlocks(dos, palette);
                     dos.writeInt(states.size());
                     for (var entry : states) {
                         var i = entry.getKey();
@@ -491,9 +498,7 @@ public class IrisObject extends IrisRegistrant {
             return;
         }
 
-        FileOutputStream out = new FileOutputStream(file);
-        write(out);
-        out.close();
+        writeAtomically(file, this::write);
     }
 
     public void write(File file, VolmitSender sender) throws IOException {
@@ -501,9 +506,43 @@ public class IrisObject extends IrisRegistrant {
             return;
         }
 
-        FileOutputStream out = new FileOutputStream(file);
-        write(out, sender);
-        out.close();
+        writeAtomically(file, o -> write(o, sender));
+    }
+
+    /**
+     * Temp-file then move: callers write straight over the loaded object file
+     * (Studio save), and a mid-write failure used to leave the source .iob
+     * truncated (plus a leaked stream - the old close() was not in a finally).
+     * The temp file sits in the same directory so the move never crosses
+     * filesystems; on failure the original is untouched.
+     */
+    private void writeAtomically(File file, IOWriter writer) throws IOException {
+        File tmp = new File(file.getParentFile(), file.getName() + ".tmp");
+        try (FileOutputStream out = new FileOutputStream(tmp)) {
+            writer.write(out);
+        } catch (Throwable e) {
+            tmp.delete();
+            if (e instanceof IOException io) throw io;
+            if (e instanceof RuntimeException r) throw r;
+            if (e instanceof Error er) throw er;
+            throw new IOException(e);
+        }
+
+        if (!tmp.renameTo(file)) {
+            tmp.delete();
+            // Fallback for platforms where rename over an existing file fails.
+            try {
+                java.nio.file.Files.move(tmp.toPath(), file.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException ex) {
+                Iris.reportError(ex);
+                throw ex;
+            }
+        }
+    }
+
+    private interface IOWriter {
+        void write(OutputStream o) throws IOException;
     }
 
     public void shrinkwrap() {

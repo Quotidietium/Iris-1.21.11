@@ -80,7 +80,11 @@ public class ObjectResourceLoader extends ResourceLoader<IrisObject> {
     private KList<String> getFiles(File dir, String ext, boolean skipDirName) {
         KList<String> paths = new KList<>();
         String name = skipDirName ? "" : dir.getName() + "/";
-        for (File f : dir.listFiles()) {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return paths; // unreadable/missing directory (locked, or a pack path that doesn't exist)
+        }
+        for (File f : files) {
             if (f.isFile() && f.getName().endsWith(ext)) {
                 paths.add(name + f.getName().replaceAll("\\Q" + ext + "\\E", ""));
             } else if (f.isDirectory()) {
