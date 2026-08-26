@@ -93,67 +93,9 @@ public final class Bukkit {
     }
 
     private static BlockData proxy(Material material, String states) {
-        String full = material.getKey().toString() + states;
-        return (BlockData) Proxy.newProxyInstance(
-                Bukkit.class.getClassLoader(),
-                new Class<?>[]{BlockData.class},
-                new BlockDataHandler(material, full, full.hashCode()));
-    }
-
-    private static final class BlockDataHandler implements InvocationHandler {
-        private final Material material;
-        private final String full;
-        private final int hash;
-
-        BlockDataHandler(Material material, String full, int hash) {
-            this.material = material;
-            this.full = full;
-            this.hash = hash;
-        }
-
-        @Override
-        public Object invoke(Object proxy, Method method, Object[] args) {
-            switch (method.getName()) {
-                case "getMaterial":
-                    return material;
-                case "getAsString":
-                    boolean withStates = args == null || args.length == 0 || (Boolean) args[0];
-                    return withStates ? full : material.getKey().toString();
-                case "hashCode":
-                    return hash;
-                case "equals":
-                    return args[0] instanceof BlockData
-                            && ((BlockData) args[0]).getAsString().equals(full);
-                case "clone":
-                    return Bukkit.proxy(material, full.substring(material.getKey().toString().length()));
-                case "toString":
-                    return "BenchBlockData{" + full + "}";
-                case "matches":
-                    return args[0] instanceof BlockData
-                            && ((BlockData) args[0]).getAsString().equals(full);
-                case "merge":
-                    return proxy;
-                case "isOccluding":
-                    return material.isOccluding();
-                case "getLightEmission":
-                    return 0;
-                default:
-                    return defaultValue(method.getReturnType());
-            }
-        }
-
-        private static Object defaultValue(Class<?> type) {
-            if (type == boolean.class) return false;
-            if (type == int.class) return 0;
-            if (type == long.class) return 0L;
-            if (type == double.class) return 0D;
-            if (type == float.class) return 0F;
-            if (type == short.class) return (short) 0;
-            if (type == byte.class) return (byte) 0;
-            if (type == char.class) return (char) 0;
-            if (type == void.class) return null;
-            return null;
-        }
+        String bare = material.getKey().toString();
+        String full = bare + states;
+        return new BenchBlockData(material, bare, full, full.hashCode());
     }
 
     // ------------------------------------------------------------------
