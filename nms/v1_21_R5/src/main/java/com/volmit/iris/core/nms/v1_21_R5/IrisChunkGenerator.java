@@ -114,7 +114,7 @@ public class IrisChunkGenerator extends CustomChunkGenerator {
                 }
             } catch (Throwable e) {
                 Iris.error("Failed to load structure: " + s.getLoadKey());
-                e.printStackTrace();
+                Iris.reportError(e);
             }
         }
     }

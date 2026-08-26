@@ -128,7 +128,7 @@ public class NMSBinding implements INMSBinding {
                     Iris.debug("[NMS] Found " + returns.getSimpleName() + " in " + in.getClass().getSimpleName() + "." + i.getName() + "()");
                     return i.invoke(in);
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             }
         }
@@ -149,7 +149,7 @@ public class NMSBinding implements INMSBinding {
                     Iris.debug("[NMS] Found " + returnType.getSimpleName() + " in " + sourceType.getSimpleName() + "." + i.getName());
                     return (T) i.get(in);
                 } catch (IllegalAccessException e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             }
         }
@@ -475,7 +475,6 @@ public class NMSBinding implements INMSBinding {
             s.setBiome(x, y, z, biome);
         } catch (IllegalAccessException e) {
             Iris.reportError(e);
-            e.printStackTrace();
         }
     }
 
@@ -491,7 +490,6 @@ public class NMSBinding implements INMSBinding {
             return f;
         } catch (Throwable e) {
             Iris.reportError(e);
-            e.printStackTrace();
             Iris.error(storage.getClass().getCanonicalName());
         }
 
@@ -585,7 +583,7 @@ public class NMSBinding implements INMSBinding {
                     }
                 } catch (IllegalAccessException e) {
                     Iris.error("Unable to get entity dimensions!");
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             }
         }
@@ -705,7 +703,7 @@ public class NMSBinding implements INMSBinding {
             return true;
         } catch (Throwable e) {
             Iris.error(C.RED + "Failed to inject Bukkit");
-            e.printStackTrace();
+            Iris.reportError(e);
         }
         return false;
     }

@@ -87,7 +87,7 @@ public class CustomBiomeSource extends BiomeSource {
                     Iris.debug("[NMS] Found " + returns.getSimpleName() + " in " + in.getClass().getSimpleName() + "." + i.getName() + "()");
                     return i.invoke(in);
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             }
         }
@@ -104,7 +104,7 @@ public class CustomBiomeSource extends BiomeSource {
                     Iris.debug("[NMS] Found " + returnType.getSimpleName() + " in " + sourceType.getSimpleName() + "." + i.getName());
                     return (T) i.get(in);
                 } catch (IllegalAccessException e) {
-                    e.printStackTrace();
+                    Iris.reportError(e);
                 }
             }
         }
