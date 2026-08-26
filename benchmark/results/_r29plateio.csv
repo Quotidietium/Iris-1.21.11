@@ -1,0 +1,3 @@
+scenario,iteration,seed,ops,ns_per_op,bytes_per_op,digest,samples
+plate-io,0,900000,100,63706755.000,8130216.0,e58bba3d3bb78da5,30000
+plate-io,1,900001,100,66692122.000,8130127.0,e58bba3d3bb78da5,30000
