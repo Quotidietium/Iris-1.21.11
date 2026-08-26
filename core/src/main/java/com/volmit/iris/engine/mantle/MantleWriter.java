@@ -94,13 +94,26 @@ public class MantleWriter implements IObjectPlacer, AutoCloseable {
                 );
             } else {
                 final Long2ObjectOpenHashMap<MantleChunk> map = (Long2ObjectOpenHashMap<MantleChunk>) cachedChunks;
+                // getChunks delivers per-region callbacks on ioBurst threads even
+                // on the single-threaded writer path (its parallelism is a plate
+                // loading fan-out, not a writer mode), so a writer spanning two or
+                // more tectonic plates would put into this map from several
+                // threads at once and corrupt the open-addressing table (an R24
+                // regression: iterator crashes in close(), lost entries). The
+                // monitor serializes only the hand-off; puts stay primitive and
+                // uncontended whenever the writer covers a single plate.
+                final Object handoff = new Object();
                 mantle.getChunks(
                         x - radius,
                         x + radius,
                         z - radius,
                         z + radius,
                         parallelism,
-                        (i, j, c) -> map.put(Cache.key(i, j), c.use())
+                        (i, j, c) -> {
+                            synchronized (handoff) {
+                                map.put(Cache.key(i, j), c.use());
+                            }
+                        }
                 );
             }
         } catch (Throwable e) {

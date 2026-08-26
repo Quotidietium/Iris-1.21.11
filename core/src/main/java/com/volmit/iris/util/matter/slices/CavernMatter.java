@@ -51,7 +51,13 @@ public class CavernMatter extends RawMatter<MatterCavern> {
     @Override
     public void writeNode(MatterCavern b, DataOutputStream dos) throws IOException {
         dos.writeBoolean(b.isCavern());
-        dos.writeUTF(b.getCustomBiome());
+        // Null customBiome (e.g. a pack JSON with "customBiome": null) used to
+        // NPE here, which aborted the whole TectonicPlate write — such a world
+        // could never persist a plate, pinning every plate in memory forever.
+        // "" is the no-custom-biome encoding on disk and reads back unchanged;
+        // in-memory consumers treat null as a crash anyway (isEmpty() calls).
+        String cb = b.getCustomBiome();
+        dos.writeUTF(cb == null ? "" : cb);
         dos.writeByte(b.getLiquid());
     }
 
