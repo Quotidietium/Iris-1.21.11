@@ -92,3 +92,21 @@ equals=true/hashEq=true/clone 一致/CHM 无重复键）；DataContainer 容器�
   可能放大了触发面）。频率 0.01~0.2% section，影响=该 section 洞穴数据丢失后重生成。
 - 修复验证臂（全新世界 + 修复 jar 完整预生成）运行中；通过后发布补丁版。
 
+## 验证臂结果（终局更正）：trim 修复必要但不充分
+
+修复 jar（含 0fb2dbcaf）+ 全新世界完整预生成 ~66 分钟（100 板盘）：**panic 仍出现（10 次），
+新 dump 4 个全部确定性复现、形状同族**（BlockData 切片 declared 数据比 reader 推导多
+138~288B；新样本 `benchmark/results/r21b/`）。结论：
+
+1. **trim 去重算术缺陷真实且已修**（单元判别 FAIL/PASS + 无重复场景 golden 逐位不变）——保留；
+2. **存在第二个产生"多余 varlong 字节"的机制**，未定位。剩余候选：
+   - R35 的 `DataBits.write`/`Varint` 多字节路径（digest 一致性已在 plate-io 场景证明，但该场景
+     的 palette 形状可能未覆盖出错值域）；
+   - 写流并发交错（同一 dos 被两个序列化路径交错写入）；
+   - `length` 与数组代际错配（写侧 data 数组比 reader 推导多一代）。
+3. 下一实验（明确）：构造「与失败 dump 逐字节同源」的单元复现——把失败切片的字节区域直接喂给
+   `DataContainer` 写读对照，或在 MantleChunk 层做 carve/unload 并发压榨；以及真机二分臂
+   （pre-R35 jar vs R35 jar 各一次完整预生成对比 panic 率）。
+4. **发布决策**：补丁版暂缓（修复不完整）；3.9.4 已发布版本的影响评估不变（0.01~0.2%、
+   恢复路径完备、预生成可完成）。用户实测卡片的 panic 行数观察项保持高权重。
+
