@@ -15,6 +15,7 @@
 
 - Paper 1.21.11（fill API 可用的近期 build）。
 - JVM：`-Xmx6G` 起步（Iris safeguard 要求 ≥6G，否则强制 Unstable 关闭引擎）；内存红线测试建议 `-Xmx8G`。
+  **务必使用 JDK 21**（JDK 25.0.4 的 G1 在高分配压力下有原生崩溃，跨 Paper/Papo 复现两次——round23/24）。
 - 插件：`Iris-3.9.5-1.20.1-1.21.11.jar`（Release 附件，含 .iob 读写提速与板盘损坏修复）。
 - （可选）spark：`/spark profiler`、`/spark tps` 用于采集。
 
