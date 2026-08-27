@@ -229,16 +229,26 @@ public class DataContainer<T> {
             return;
         }
 
-        int bits = bits(distinct + 1);
-        var trimmed = newPalette(bits);
         // Re-add survivors in ascending old-id order (same mapping order the
-        // previous tree-map implementation produced).
+        // previous tree-map implementation produced). The palette may hold
+        // DUPLICATE values under different ids (a palette key mutated in
+        // place rehashes away from its CHM bucket, so a later add of an equal
+        // value misses and appends a second id). trimmed.add dedups those,
+        // making trimmed.size() potentially SMALLER than distinct — so the
+        // repacked DataBits MUST be sized from the post-dedup palette, not
+        // from distinct. Sizing from distinct produced a (palette.size(),
+        // data.getBits()) mismatch, and since the reader derives its varlong
+        // count from bits(paletteSize+1), every such slice wrote more varlongs
+        // than any reader would consume — the round20/21 "Matter slice read
+        // size mismatch" plate corruption.
         int[] remap = new int[paletteSize + 2];
+        var trimmed = newPalette(Math.max(3, bits(distinct + 1)));
         for (int id = 1; id <= paletteSize; id++) {
             if (used[id] > 0) {
                 remap[id] = trimmed.add(palette.get(id));
             }
         }
+        int bits = Math.max(3, bits(trimmed.size() + 1));
         var tBits = new DataBits(bits, length);
         for (int i = 0; i < length; i++) {
             int x = data.getOpaque(i);

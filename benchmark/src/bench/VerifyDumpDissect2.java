@@ -147,6 +147,7 @@ public class VerifyDumpDissect2 {
             long nodeBytes = 0;
             boolean cavern = cls.endsWith("MatterCavern");
             boolean block = cls.endsWith("BlockData");
+            java.util.List<String> nodeStrs = block ? new java.util.ArrayList<>() : null;
             for (int p = 0; p < palSize; p++) {
                 if (cavern) {
                     u8();
@@ -156,7 +157,9 @@ public class VerifyDumpDissect2 {
                     nodeBytes += 1 + 2 + ul + 1;
                 } else if (block || cls.equals("java.lang.String") || cls.endsWith("MatterMarker")) {
                     int ul = u16();
-                    for (int ub = 0; ub < ul; ub++) u8();
+                    StringBuilder sb = new StringBuilder();
+                    for (int ub = 0; ub < ul; ub++) sb.append((char) u8());
+                    if (nodeStrs != null) nodeStrs.add(sb.toString());
                     nodeBytes += 2 + ul;
                 } else {
                     u8();
@@ -179,6 +182,14 @@ public class VerifyDumpDissect2 {
                 System.out.printf("  MISMATCH chunk[%d] sec%d slice#%d %s: declared=%d accounted=%d pos=%d wantEnd=%d (len=%d pal=%d bits=%d longs=%d nodeB=%d dataB=%d hdrB=%d)%n",
                         ci, sec, si, cls, declared, accounted, count, sliceEnd, len, palSize, bits, longs, nodeBytes, dataBytes, headerBytes);
                 problems++;
+            } else if (cls.endsWith("BlockData")) {
+                // dry-run pass for the mismatch slices: print palette strings
+            }
+            if (nodeStrs != null && name.contains("pv.2.") && nodeStrs.size() > 1) {
+                java.util.Set<String> uniq = new java.util.HashSet<>(nodeStrs);
+                if (uniq.size() != nodeStrs.size()) {
+                    System.out.println("  DUP-PALETTE chunk[" + ci + "] sec" + sec + " slice#" + si + ": " + nodeStrs.size() + " nodes, " + uniq.size() + " unique: " + nodeStrs);
+                }
             }
             skipTo(sliceEnd);
         }
