@@ -1,6 +1,6 @@
-# Round 21 — MatterCavern/BlockData 板盘切片错位：确定性复现与逐层排除（进行中）
+# Round 21 — 板盘切片尺寸错位：根因闭环与修复（终版）
 
-日期：2026-08-27 · 基线：发布版 3.9.4 jar（与 Release 附件同字节）· 状态：根因收窄中
+日期：2026-08-27 · 状态：**根因确定 + 修复已提交（0fb2dbcaf）+ 真机验证臂运行中**
 
 ## TL;DR
 
@@ -53,10 +53,42 @@ DataContainer 的锁纪律、R35 脏标志、R31 预置、setBits 重打包、tr
 3. 复现策略：MantleChunk 级并发压榨器（carve 线程 + unload/write 线程同一 chunk 集合），或
    真机逐轮二分（关 R35 脏标志 / 回退 R34 / R33，每臂一次完整预生成 ~2h）。
 
-## 对 3.9.4 的影响评估
+## 根因（终局）
 
-- 频率：140k 区块 12~280 次（0.01~0.2%），恢复路径=跳切片/跳 section 重生成，预生成可完成。
-- 影响：受影响 section 的洞穴/方块 matter 数据丢失（该 section 重生成时会以空 matter 处理——
-  洞穴在该 section 内可能表现为实心）。
-- **不是 R32-R35 的已知回归形状**（容器级已排除；读端代码与 3.9.3 逐字相同），但 R35 加速写盘
-  后时间窗变化可能改变触发频率。用户实测卡片中 panic 行数观察项权重提高。
+**palette 中的重复值**：dump 解码显示每个坏切片的 palette 恰好含一对**字符串完全相同**的条目
+（全部为栅栏族 MultipleFacing 状态）。机制链：
+
+1. 某处代码**原地修改了已进入 palette 的 BlockData**（未 clone）——其 hashCode 随状态漂移，
+   在 HashPalette 的 CHM 中变成"桶孤儿"（条目仍物理存在于旧哈希桶）；
+2. 之后同值方块再入 palette 时 `computeIfAbsent` 按新哈希查旧桶未命中 → **追加第二个 id**——
+   byId 数组中两个 id 持有 equals 相等的值；
+3. **trim() 的算术缺陷**：`bits = bits(distinct + 1)` 用**去重前**的使用计数分配重打包数组，
+   而 `trimmed.add()` 按 CHM 值语义**去重**——重复对收敛为单条目后 `trimmed.size() < distinct`，
+   于是 `palette.size()`（写盘的 paletteSize）与 `data.getBits()`（数组的实际位宽）**错开一档**；
+4. 读方按 `bits(paletteSize+1)` 推导 varlong 数量 → 永远少读 → "Matter slice read size mismatch"
+   → 跳切片/跳 section → 洞穴数据丢失。**修复前该机制在单元级复现为 left over=540B/196 varlongs
+   ——与真实 dump 的 171~385B 残留同形状。**
+
+排除项（全部机器验证）：真机 CraftBlockData equals/hashCode 一致（服务器内插件实测栅栏态
+equals=true/hashEq=true/clone 一致/CHM 无重复键）；DataContainer 容器级单线程 1089 场景与
+并发 1.77 亿操作零分歧（排除 R31/R35 改动本身）。
+
+### 修复（0fb2dbcaf）
+
+`DataContainer.trim()`：重打包 DataBits 的位宽改用**去重后**的 `bits(trimmed.size() + 1)`
+（构建 trimmed 之后计算）；升 id 重映射顺序与无重复场景的输出完全不变（golden 56/56 逐位一致）。
+`VerifyTrimDup`：可变哈希键在单元级完整复现「原地变更→CHM 孤儿→重复 id→trim 错位」，
+**修复前 FAIL / 修复后 PASS** 的判别证据入库。
+
+### 遗留（后续审计项）
+
+- 找到那个「未 clone 就原地修改 palette 驻留 BlockData」的调用点（栅栏族状态是线索——
+  MultipleFacing 的 setFace 变更；R34 修复过 stilt 路径，dump 证明仍有别处在漏）；
+- `Matter.writeDos` 的 `getSliceTypes()` 双调用仍是真实缺陷面（本次未触发）。
+
+## 对 3.9.4 的影响与发布动作
+
+- 该缺陷**上游自 trim 实现以来即存在**（非 R32-R35 引入；R34 的 memo 使共享实例更常见、
+  可能放大了触发面）。频率 0.01~0.2% section，影响=该 section 洞穴数据丢失后重生成。
+- 修复验证臂（全新世界 + 修复 jar 完整预生成）运行中；通过后发布补丁版。
+
