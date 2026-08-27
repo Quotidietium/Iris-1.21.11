@@ -20,6 +20,7 @@ package com.volmit.iris.core;
 
 import com.google.gson.Gson;
 import com.volmit.iris.Iris;
+import com.volmit.iris.util.data.B;
 import com.volmit.iris.util.io.IO;
 import com.volmit.iris.util.json.JSONException;
 import com.volmit.iris.util.json.JSONObject;
@@ -97,6 +98,8 @@ public class IrisSettings {
     public static void invalidate() {
         synchronized (IrisSettings.class) {
             settings = null;
+            // Cached parses bake in the preventLeafDecay flag; a reload can flip it.
+            B.invalidateParseMemo();
         }
     }
 

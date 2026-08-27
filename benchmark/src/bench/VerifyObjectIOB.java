@@ -35,6 +35,23 @@ public class VerifyObjectIOB {
                     if (r.nextInt(3) > 0)
                         o.setUnsigned(x, y, z, new BlockData[]{log, leaf, stone, leaf, log}[r.nextInt(5)]);
 
+        // Multi-chunk extension (R32): blocks spanning VectorMap chunk
+        // boundaries (chunk key = coord >> 10). Production builds the palette
+        // over the cursor iterator while the write loop walks the entry
+        // iterator, and the legacy reference below built its palette over
+        // values(); byte identity here proves all three traversals agree on
+        // order ACROSS chunks, not just within one.
+        org.bukkit.util.BlockVector[] far = {
+                new org.bukkit.util.BlockVector(0, 0, 0),
+                new org.bukkit.util.BlockVector(700, 3, 3),
+                new org.bukkit.util.BlockVector(1024, 5, 5),
+                new org.bukkit.util.BlockVector(1500, 7, 7),
+                new org.bukkit.util.BlockVector(-1300, 2, 8)};
+        BlockData[] farData = {stone, leaf, log, stone, leaf};
+        for (int i = 0; i < far.length; i++) {
+            o.getBlocks().put(far[i], farData[i]);
+        }
+
         byte[] fresh;
         try (ByteArrayOutputStream bo = new ByteArrayOutputStream()) {
             o.write(bo);
@@ -51,6 +68,13 @@ public class VerifyObjectIOB {
         IrisObject back = new IrisObject(0, 0, 0);
         try { back.read(new java.io.ByteArrayInputStream(fresh)); } catch (Throwable t) { throw new RuntimeException(t); }
         check(back.getW() == o.getW() && back.getH() == o.getH() && back.getD() == o.getD(), "dimensions");
+        check(back.getBlocks().size() == o.getBlocks().size(),
+                "block count " + back.getBlocks().size() + " vs " + o.getBlocks().size());
+        for (int i = 0; i < far.length; i++) {
+            BlockData b = back.getBlocks().get(far[i]);
+            check(b != null && b.getAsString().equals(farData[i].getAsString()),
+                    "multi-chunk block lost/altered at " + far[i]);
+        }
         int n = 0;
         for (int x = 0; x < 9; x++)
             for (int y = 0; y < 13; y++)

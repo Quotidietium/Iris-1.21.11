@@ -31,6 +31,7 @@ import com.volmit.iris.util.noise.NoiseType;
 import com.volmit.iris.util.parallel.HyperLock;
 import com.volmit.iris.util.stream.ProceduralStream;
 import org.bukkit.Material;
+import org.bukkit.SoundGroup;
 import org.bukkit.block.data.BlockData;
 
 import java.io.ByteArrayInputStream;
@@ -74,6 +75,258 @@ public final class Benchmark {
         public int getRarity() {
             return rarity;
         }
+    }
+
+    /**
+     * Server-shaped BlockData for the .iob write scenarios: unlike
+     * org.bukkit.BenchBlockData, every getAsString() call returns a NEW
+     * string instance, exactly like CraftBlockData on a real server. The
+     * cached-instance stub lets String.equals answer via the reference
+     * fast-path, hiding the palette scan costs these scenarios measure.
+     */
+    static final class FreshStringBlockData implements BlockData {
+        private final Material material;
+        private final String bare; // "minecraft:key"
+        private final String full; // "minecraft:key[states]"
+        private final int hash;
+
+        FreshStringBlockData(Material material, String bare, String full) {
+            this.material = material;
+            this.bare = bare;
+            this.full = full;
+            this.hash = full.hashCode();
+        }
+
+        @Override
+        public Material getMaterial() {
+            return material;
+        }
+
+        @Override
+        public String getAsString() {
+            return new String(full);
+        }
+
+        @Override
+        public String getAsString(boolean withStates) {
+            return new String(withStates ? full : bare);
+        }
+
+        @Override
+        public BlockData merge(BlockData data) {
+            return this;
+        }
+
+        @Override
+        public boolean matches(BlockData data) {
+            return data != null && data.getAsString().equals(full);
+        }
+
+        @Override
+        public BlockData clone() {
+            return new FreshStringBlockData(material, bare, full);
+        }
+
+        @Override
+        public SoundGroup getSoundGroup() {
+            return null;
+        }
+
+        @Override
+        public int getLightEmission() {
+            return 0;
+        }
+
+        @Override
+        public boolean isOccluding() {
+            return material.isOccluding();
+        }
+
+        @Override
+        public boolean requiresCorrectToolForDrops() {
+            return false;
+        }
+
+        @Override
+        public boolean isPreferredTool(org.bukkit.inventory.ItemStack item) {
+            return false;
+        }
+
+        @Override
+        public org.bukkit.block.PistonMoveReaction getPistonMoveReaction() {
+            return null;
+        }
+
+        @Override
+        public boolean isSupported(org.bukkit.block.Block block) {
+            return false;
+        }
+
+        @Override
+        public boolean isSupported(org.bukkit.Location location) {
+            return false;
+        }
+
+        @Override
+        public boolean isFaceSturdy(org.bukkit.block.BlockFace face, org.bukkit.block.BlockSupport support) {
+            return false;
+        }
+
+        @Override
+        public Material getPlacementMaterial() {
+            return null;
+        }
+
+        @Override
+        public void rotate(org.bukkit.block.structure.StructureRotation rotation) {
+        }
+
+        @Override
+        public void mirror(org.bukkit.block.structure.Mirror mirror) {
+        }
+
+        @Override
+        public org.bukkit.block.BlockState createBlockState() {
+            return null;
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof BlockData && ((BlockData) o).getAsString().equals(full);
+        }
+
+        @Override
+        public String toString() {
+            return "FreshStringBlockData{" + full + "}";
+        }
+    }
+
+    /**
+     * Builds a solid sx*sy*sz IrisObject over the given palette width (all
+     * palette entries exercised) — shared by the .iob write and read
+     * scenarios so both measure the same object shapes.
+     */
+    private static com.volmit.iris.engine.object.IrisObject buildIoObject(int sx, int sy, int sz, int paletteSize) {
+        Material[] mats = {Material.STONE, Material.OAK_LOG, Material.OAK_LEAVES,
+                Material.DIRT, Material.SAND, Material.COBBLESTONE};
+        BlockData[] palette = new BlockData[paletteSize];
+        for (int i = 0; i < paletteSize; i++) {
+            String s = "minecraft:" + mats[i % mats.length].name().toLowerCase()
+                    + "[mode=" + (i % 4) + ",variant=" + i + "]";
+            palette[i] = new FreshStringBlockData(mats[i % mats.length], s.substring(0, s.indexOf('[')), s);
+        }
+        com.volmit.iris.engine.object.IrisObject o =
+                new com.volmit.iris.engine.object.IrisObject(sx, sy, sz);
+        for (int x = 0; x < sx; x++) {
+            for (int y = 0; y < sy; y++) {
+                for (int z = 0; z < sz; z++) {
+                    o.setUnsigned(x, y, z, palette[(x * 31 + y * 57 + z * 101) % paletteSize]);
+                }
+            }
+        }
+        return o;
+    }
+
+    /**
+     * One .iob write() scenario: each op fully serializes the object to a
+     * heap buffer. The digest folds the output length plus every 7th byte so
+     * the scenario doubles as a write-format regression probe; full
+     * byte-identity is proven separately by VerifyObjectIOB.
+     */
+    private static Scenario ioWriteScenario(String name, int sx, int sy, int sz, int paletteSize, int ops) {
+        com.volmit.iris.engine.object.IrisObject o = buildIoObject(sx, sy, sz, paletteSize);
+        return new Scenario() {
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public int ops() {
+                return ops;
+            }
+
+            @Override
+            public double run(int n, long seed, Digest dg) {
+                double bh = 0;
+                for (int i = 0; i < n; i++) {
+                    try {
+                        ByteArrayOutputStream bo = new ByteArrayOutputStream(1 << 16);
+                        o.write(bo);
+                        byte[] bytes = bo.toByteArray();
+                        dg.add(bytes.length);
+                        for (int j = 0; j < bytes.length; j += 7) {
+                            dg.add(bytes[j]);
+                        }
+                        bh += bytes.length;
+                    } catch (java.io.IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                return bh;
+            }
+        };
+    }
+
+    /**
+     * One .iob read() scenario: the shared fixture object is serialized once
+     * at setup; each op reads the bytes back into a fresh IrisObject. The
+     * digest folds the full read-back content via the zero-alloc cursor
+     * iterator (coords + material) plus the block count, so the scenario
+     * doubles as a read-path content regression probe — before/after digests
+     * must match bit-for-bit.
+     */
+    private static Scenario ioReadScenario(String name, int sx, int sy, int sz, int paletteSize, int ops) {
+        com.volmit.iris.engine.object.IrisObject fixture = buildIoObject(sx, sy, sz, paletteSize);
+        ByteArrayOutputStream bo = new ByteArrayOutputStream(1 << 16);
+        try {
+            fixture.write(bo);
+        } catch (java.io.IOException e) {
+            throw new RuntimeException(e);
+        }
+        byte[] bytes = bo.toByteArray();
+        return new Scenario() {
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public int ops() {
+                return ops;
+            }
+
+            @Override
+            public double run(int n, long seed, Digest dg) {
+                double bh = 0;
+                for (int i = 0; i < n; i++) {
+                    com.volmit.iris.engine.object.IrisObject t =
+                            new com.volmit.iris.engine.object.IrisObject(0, 0, 0);
+                    try {
+                        t.read(new ByteArrayInputStream(bytes));
+                    } catch (Throwable ex) {
+                        throw new RuntimeException(ex);
+                    }
+                    int sz = 0;
+                    for (var it = t.getBlocks().cursorIterator(); it.hasNext(); ) {
+                        var c = it.next();
+                        dg.add(c.x);
+                        dg.add(c.y);
+                        dg.add(c.z);
+                        dg.add(c.value.getMaterial().ordinal());
+                        sz++;
+                    }
+                    dg.add(sz);
+                    bh += sz;
+                }
+                return bh;
+            }
+        };
     }
 
     interface Scenario {
@@ -828,6 +1081,48 @@ public final class Benchmark {
                         return bh;
                     }
                 });
+            }
+
+            // ---- IrisObject.write/read: .iob serialization (Studio save + conversions + object loading) ----
+            // FreshStringBlockData mirrors CraftBlockData: getAsString()
+            // allocates a new string per call, so palette dedup and id lookup
+            // pay real string-compare costs. Shapes: small = hand-edit scale,
+            // large = big structure, wide = conversion-scale palette.
+            // Read scenarios use the same fixtures serialized once — the
+            // object-loader KCache miss path (load storms during pregen).
+            {
+                out.add(ioWriteScenario("object-iowrite-small", 40, 25, 10, 12, 40));
+                out.add(ioWriteScenario("object-iowrite-large", 100, 50, 20, 32, 8));
+                out.add(ioWriteScenario("object-iowrite-wide", 150, 80, 25, 96, 2));
+                out.add(ioReadScenario("object-ioread-small", 40, 25, 10, 12, 40));
+                out.add(ioReadScenario("object-ioread-large", 100, 50, 20, 32, 8));
+                out.add(ioReadScenario("object-ioread-wide", 150, 80, 25, 96, 2));
+            }
+
+            // ---- B.get choke point (block string parse / R34 memo) ----
+            // Every B.get call on a minecraft:* string re-parses: toLowerCase
+            // + static synchronized createBlockData (the custom map only ever
+            // holds third-party provider registrations). String mix mirrors
+            // the io fixtures (stateful variants, proven parseable by the
+            // stub) so before/after A/B isolates the parse-vs-memo-hit cost.
+            {
+                Material[] mats = {Material.STONE, Material.OAK_LOG, Material.OAK_LEAVES,
+                        Material.DIRT, Material.SAND, Material.COBBLESTONE};
+                String[] mix = new String[16];
+                for (int i = 0; i < mix.length; i++) {
+                    mix[i] = "minecraft:" + mats[i % mats.length].name().toLowerCase()
+                            + "[mode=" + (i % 4) + ",variant=" + i + "]";
+                }
+                out.add(sc("bget-parse", (n, seed, dg) -> {
+                    Random r = new Random(seed);
+                    double bh = 0;
+                    for (int i = 0; i < n; i++) {
+                        BlockData v = B.get(mix[r.nextInt(mix.length)]);
+                        dg.add(v.getMaterial().ordinal());
+                        bh += v.getMaterial().ordinal();
+                    }
+                    return bh;
+                }));
             }
 
             // ---- Decorator path: per-column selection + surface placement ----

@@ -236,9 +236,25 @@ public class DataBits {
 
     public void write(DataOutputStream dos) throws IOException {
         // Whole-array dump under the container's write lock (or on an
-        // unpublished instance): plain-coherent reads suffice per long.
+        // unpublished instance): plain-coherent reads suffice per long. The
+        // scratch buffer lives outside the loop: packed longs are virtually
+        // always multi-byte varlongs, so a per-call buffer inside
+        // Varint.writeUnsignedVarLong would allocate one byte[10] per long.
+        // Encoding is identical to that method.
+        byte[] buf = new byte[10];
         for (int i = 0; i < data.length(); i++) {
-            Varint.writeUnsignedVarLong(data.getOpaque(i), dos);
+            long value = data.getOpaque(i);
+            if ((value & 0xFFFFFFFFFFFFFF80L) == 0L) {
+                dos.writeByte((int) value);
+                continue;
+            }
+            int j = 0;
+            while ((value & 0xFFFFFFFFFFFFFF80L) != 0L) {
+                buf[j++] = (byte) (((int) value & 0x7F) | 0x80);
+                value >>>= 7;
+            }
+            buf[j] = (byte) ((int) value & 0x7F);
+            dos.write(buf, 0, j + 1);
         }
     }
 }
