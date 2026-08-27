@@ -18,3 +18,4 @@ benchmark/lib/*.jar
 prof18/
 *.jfr
 benchmark/out/
+/test
