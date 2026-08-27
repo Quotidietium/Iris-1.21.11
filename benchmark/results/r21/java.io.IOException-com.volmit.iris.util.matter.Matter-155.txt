@@ -1,0 +1,18 @@
+Thread: Iris IO 9
+First: Thu Aug 27 14:01:50 CST 2026
+java.io.IOException: Matter slice read size mismatch!
+	at Iris-3.9.4-1.20.1-1.21.11.jar//com.volmit.iris.util.matter.Matter.readDin(Matter.java:155)
+	at Iris-3.9.4-1.20.1-1.21.11.jar//com.volmit.iris.util.matter.Matter.readDin(Matter.java:113)
+	at Iris-3.9.4-1.20.1-1.21.11.jar//com.volmit.iris.util.mantle.MantleChunk.<init>(MantleChunk.java:91)
+	at Iris-3.9.4-1.20.1-1.21.11.jar//com.volmit.iris.util.mantle.TectonicPlate.<init>(TectonicPlate.java:85)
+	at Iris-3.9.4-1.20.1-1.21.11.jar//com.volmit.iris.util.mantle.io.IOWorker.read(IOWorker.java:61)
+	at Iris-3.9.4-1.20.1-1.21.11.jar//com.volmit.iris.util.mantle.Mantle.lambda$getSafe$15(Mantle.java:740)
+	at Iris-3.9.4-1.20.1-1.21.11.jar//com.volmit.iris.util.parallel.HyperLock.withResult(HyperLock.java:125)
+	at Iris-3.9.4-1.20.1-1.21.11.jar//com.volmit.iris.util.mantle.Mantle.lambda$getSafe$16(Mantle.java:727)
+	at Iris-3.9.4-1.20.1-1.21.11.jar//com.volmit.iris.util.parallel.MultiBurst.lambda$completableFuture$3(MultiBurst.java:181)
+	at java.base/java.util.concurrent.ForkJoinTask$AdaptedInterruptibleRunnable.compute(ForkJoinTask.java:1737)
+	at java.base/java.util.concurrent.ForkJoinTask$InterruptibleTask.exec(ForkJoinTask.java:1662)
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:511)
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1450)
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:2019)
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:187)
