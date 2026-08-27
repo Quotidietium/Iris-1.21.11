@@ -124,9 +124,7 @@ public class DataContainer<T> {
     public void writeDos(DataOutputStream dos) throws IOException {
         write.lock();
         try {
-            if (dirty) {
-                trim();
-            }
+            trim();
             Varint.writeUnsignedVarInt(length, dos);
             Varint.writeUnsignedVarInt(palette.size(), dos);
             palette.iterateIO((data, __) -> writer.writeNodeData(dos, data));
