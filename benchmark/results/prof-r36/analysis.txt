@@ -1,0 +1,140 @@
+
+===== carve-modify  (exec samples: 378, alloc samples: 1215) =====
+-- execution, hottest leaf frames --
+   32.3%  com.volmit.iris.util.mantle.MantleChunk.lambda$iterateInts$0
+   14.6%  bench.Benchmark$10.run
+    9.8%  org.bukkit.Material.isAir
+    5.3%  org.bukkit.Material.$SWITCH_TABLE$org$bukkit$Material
+    4.5%  java.util.concurrent.ConcurrentHashMap.transfer
+    4.5%  java.util.concurrent.ConcurrentHashMap.putVal
+    2.9%  java.util.concurrent.ConcurrentHashMap.get
+    2.6%  java.util.HashMap.getNode
+    2.6%  com.volmit.iris.util.hunk.storage.PaletteHunk.iterateSyncInts
+    1.9%  com.volmit.iris.engine.modifier.IrisCarveModifier.processZone
+-- execution, first iris frame on stack --
+   32.3%  com.volmit.iris.util.mantle.MantleChunk.lambda$iterateInts$0
+   20.6%  com.volmit.iris.engine.modifier.IrisCarveModifier.lambda$onModify$0
+    7.7%  com.volmit.iris.engine.modifier.IrisCarveModifier.onModify
+    3.2%  com.volmit.iris.util.data.B.isSolid
+    2.6%  com.volmit.iris.util.matter.IrisMatter.slice
+    2.6%  com.volmit.iris.util.hunk.storage.PaletteHunk.iterateSyncInts
+    2.1%  com.volmit.iris.util.data.VectorMap.put
+    1.9%  com.volmit.iris.engine.modifier.IrisCarveModifier.processZone
+    1.6%  com.volmit.iris.engine.modifier.IrisCarveModifier.lambda$onModify$1
+    1.3%  com.volmit.iris.util.data.B.isDecorant
+-- allocation, heaviest classes (KB sampled) --
+   46.0%        0.55 MB  bootstrap)  @ com.volmit.iris.engine.modifier.IrisCarveModifier.lambda$onModify$0
+   30.3%        0.36 MB  bootstrap)  @ com.volmit.iris.engine.modifier.IrisCarveModifier.onModify
+   14.7%        0.18 MB  app)  @ com.volmit.iris.engine.modifier.IrisCarveModifier.lambda$onModify$0
+    2.7%        0.03 MB  bootstrap)  @ com.volmit.iris.util.data.VectorMap.put
+    2.5%        0.03 MB  bootstrap)  @ 
+    1.6%        0.02 MB  app)  @ com.volmit.iris.util.data.VectorMap.chunk
+    0.9%        0.01 MB  app)  @ com.volmit.iris.util.data.VectorMap.relative
+    0.5%        0.01 MB  app)  @ com.volmit.iris.engine.modifier.IrisCarveModifier.onModify
+    0.2%        0.00 MB  app)  @ 
+    0.1%        0.00 MB  app)  @ com.volmit.iris.engine.object.IrisObject.getSigned
+
+===== deposit-place  (exec samples: 30, alloc samples: 206) =====
+-- execution, hottest leaf frames --
+   20.0%  java.util.concurrent.ConcurrentHashMap.transfer
+   16.7%  bench.Benchmark.buildScenarios
+    3.3%  java.util.Arrays.copyOf
+    3.3%  com.google.common.collect.RegularImmutableMap.fromEntryArrayCheckingBucketOverflow
+    3.3%  java.lang.StringLatin1.indexOf
+    3.3%  com.volmit.iris.util.data.VectorMap.put
+    3.3%  java.util.concurrent.ConcurrentHashMap.putVal
+    3.3%  com.volmit.iris.engine.object.IrisObject.buildPalette
+    3.3%  com.volmit.iris.engine.object.IrisObject.writePaletteAndBlocks
+    3.3%  com.volmit.iris.util.data.VectorMap$EntryIterator.next
+-- execution, first iris frame on stack --
+   23.3%  com.volmit.iris.util.data.VectorMap.put
+    6.7%  com.volmit.iris.engine.object.IrisObject.writePaletteAndBlocks
+    6.7%  com.volmit.iris.util.data.VectorMap.lambda$forEachCoords$0
+    3.3%  com.volmit.iris.engine.object.IrisObject.buildPalette
+    3.3%  com.volmit.iris.util.data.VectorMap$EntryIterator.next
+    3.3%  com.volmit.iris.util.data.VectorMap$CursorIterator.next
+    3.3%  com.volmit.iris.util.hunk.bits.HashPalette.id
+    3.3%  com.volmit.iris.util.hunk.storage.ArrayHunk.getRaw
+    3.3%  com.volmit.iris.util.data.B.isDeepSlate
+    3.3%  com.volmit.iris.util.mantle.MantleChunk.get
+-- allocation, heaviest classes (KB sampled) --
+   30.8%        0.06 MB  bootstrap)  @ com.volmit.iris.util.data.VectorMap.put
+   13.8%        0.03 MB  bootstrap)  @ 
+   12.9%        0.02 MB  app)  @ com.volmit.iris.util.data.VectorMap.chunk
+   11.7%        0.02 MB  app)  @ com.volmit.iris.util.data.VectorMap.relative
+    8.7%        0.02 MB  app)  @ com.volmit.iris.util.data.VectorMap$Key.resolve
+    5.1%        0.01 MB  bootstrap)  @ com.volmit.iris.util.data.VectorMap$EntryIterator.next
+    3.9%        0.01 MB  app)  @ com.volmit.iris.util.data.VectorMap.lambda$forEachCoords$0
+    3.9%        0.01 MB  bootstrap)  @ com.volmit.iris.engine.object.IrisObject.buildPalette
+    2.8%        0.01 MB  app)  @ 
+    1.7%        0.00 MB  bootstrap)  @ com.volmit.iris.util.data.VectorMap.lambda$forEachCoords$0
+
+===== matter-roundtrip  (exec samples: 257, alloc samples: 632) =====
+-- execution, hottest leaf frames --
+   26.8%  java.util.concurrent.ConcurrentHashMap.get
+   13.6%  java.util.Random.nextInt
+    8.6%  bench.Benchmark$4.run
+    6.2%  java.lang.invoke.VarHandleLongs$Array.getVolatile
+    5.1%  java.lang.invoke.VarHandleLongs$Array.setVolatile
+    3.9%  java.io.ByteArrayInputStream.read
+    3.9%  com.volmit.iris.util.hunk.bits.DataContainer.set
+    3.5%  com.volmit.iris.util.hunk.bits.DataContainer.trim
+    3.5%  com.volmit.iris.util.hunk.bits.HashPalette.ensureCapacity
+    2.3%  java.lang.invoke.VarHandleLongs$Array.getOpaque
+-- execution, first iris frame on stack --
+   26.5%  com.volmit.iris.util.hunk.bits.HashPalette.id
+    7.0%  com.volmit.iris.util.hunk.bits.DataBits.setBits
+    6.2%  com.volmit.iris.util.hunk.bits.DataBits.get
+    3.9%  com.volmit.iris.util.io.CountingDataInputStream$Counter.read
+    3.9%  com.volmit.iris.util.hunk.bits.DataContainer.set
+    3.5%  com.volmit.iris.util.hunk.bits.DataContainer.trim
+    3.5%  com.volmit.iris.util.hunk.bits.HashPalette.ensureCapacity
+    2.3%  com.volmit.iris.util.data.VectorMap.put
+    2.3%  com.volmit.iris.util.hunk.bits.DataBits.getOpaque
+    1.9%  com.volmit.iris.util.hunk.bits.DataBits.write
+-- allocation, heaviest classes (KB sampled) --
+   17.4%        0.10 MB  bootstrap)  @ com.volmit.iris.util.hunk.bits.DataBits.<init>
+   15.1%        0.09 MB  bootstrap)  @ 
+    9.3%        0.06 MB  bootstrap)  @ com.volmit.iris.util.data.VectorMap.put
+    8.7%        0.05 MB  bootstrap)  @ com.volmit.iris.util.hunk.bits.HashPalette.add
+    7.2%        0.04 MB  bootstrap)  @ com.volmit.iris.util.hunk.bits.HashPalette.from
+    5.8%        0.03 MB  bootstrap)  @ com.volmit.iris.util.hunk.bits.DataBits.write
+    4.5%        0.03 MB  app)  @ com.volmit.iris.util.data.VectorMap.relative
+    4.4%        0.03 MB  bootstrap)  @ com.volmit.iris.util.hunk.bits.HashPalette.grow
+    3.7%        0.02 MB  app)  @ com.volmit.iris.util.data.VectorMap.chunk
+    3.6%        0.02 MB  bootstrap)  @ com.volmit.iris.util.hunk.bits.DataBits.longs
+
+===== terrain-col-fill  (exec samples: 300, alloc samples: 537) =====
+-- execution, hottest leaf frames --
+   31.0%  com.volmit.iris.engine.object.IrisBiome.generateSeaLayers
+   25.3%  com.volmit.iris.engine.actuator.TerrainColumn.fill
+   19.7%  bench.Benchmark$RecordingHunk.setRaw
+   10.0%  com.volmit.iris.engine.object.IrisDimension.generateOres
+    2.3%  bench.Benchmark.lambda$buildScenarios$19
+    2.0%  bench.Benchmark.buildScenarios
+    1.7%  com.volmit.iris.engine.object.IrisBiome.generateLayers
+    1.3%  com.volmit.iris.engine.object.IrisDimension.hasOres
+    0.7%  java.util.concurrent.ConcurrentHashMap.transfer
+    0.7%  java.util.concurrent.ConcurrentHashMap.putVal
+-- execution, first iris frame on stack --
+   31.0%  com.volmit.iris.engine.object.IrisBiome.generateSeaLayers
+   25.3%  com.volmit.iris.engine.actuator.TerrainColumn.fill
+   19.7%  com.volmit.iris.util.hunk.Hunk.set
+   10.0%  com.volmit.iris.engine.object.IrisDimension.generateOres
+    1.7%  com.volmit.iris.util.data.VectorMap.put
+    1.7%  com.volmit.iris.engine.object.IrisBiome.generateLayers
+    1.3%  com.volmit.iris.engine.object.IrisDimension.hasOres
+    1.0%  com.volmit.iris.engine.object.IrisObject.writePaletteAndBlocks
+    0.3%  com.volmit.iris.util.data.VectorMap$EntryIterator.next
+    0.3%  com.volmit.iris.engine.framework.SeedManager.of
+-- allocation, heaviest classes (KB sampled) --
+   22.5%        0.11 MB  app)  @ com.volmit.iris.engine.object.IrisBiome.generateSeaLayers
+   22.3%        0.11 MB  app)  @ com.volmit.iris.engine.object.IrisBiome.generateLayers
+   21.2%        0.11 MB  bootstrap)  @ com.volmit.iris.engine.object.IrisBiome.generateLayers
+   12.1%        0.06 MB  bootstrap)  @ com.volmit.iris.util.data.VectorMap.put
+    5.7%        0.03 MB  bootstrap)  @ 
+    4.2%        0.02 MB  app)  @ com.volmit.iris.util.data.VectorMap.relative
+    3.6%        0.02 MB  app)  @ com.volmit.iris.util.data.VectorMap.chunk
+    2.9%        0.01 MB  bootstrap)  @ com.volmit.iris.util.data.VectorMap$EntryIterator.next
+    1.8%        0.01 MB  app)  @ com.volmit.iris.util.data.VectorMap$Key.resolve
+    1.7%        0.01 MB  bootstrap)  @ com.volmit.iris.engine.object.IrisObject.buildPalette
